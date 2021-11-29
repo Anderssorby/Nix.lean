@@ -3,7 +3,7 @@
 
   inputs = {
     lean = {
-      url = github:yatima-inc/lean4/acs/add-nix-ability-for-native-libs;
+      url = github:leanprover/lean4;
     };
     nixpkgs.url = github:nixos/nixpkgs/nixos-21.05;
     flake-utils = {
@@ -11,7 +11,11 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     # A lean dependency
-    lean-ipld.url = github:yatima-inc/lean-ipld;
+    lean-ipld = {
+      url = github:yatima-inc/lean-ipld;
+      inputs.lean.follows = "lean";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs = { self, lean, flake-utils, nixpkgs, lean-ipld }:
@@ -31,7 +35,7 @@
         name = "Nix";  # must match the name of the top-level .lean file
         project = leanPkgs.buildLeanPackage {
           inherit name;
-          deps = with leanPkgs; [ Init Lean ];#lean-ipld.project.${system} ];
+          # deps = with leanPkgs; [ Init Lean ];#lean-ipld.project.${system} ];
           # Where the lean files are located
           src = ./src;
         };
@@ -41,6 +45,8 @@
           # Where the lean files are located
           src = ./test;
         };
+        joinDepsDerivations = getSubDrv:
+          pkgs.lib.concatStringsSep ":" (map (d: (builtins.tryEval "${getSubDrv d}").value) ([ project test ] ++ project.allExternalDeps));
       in
       {
         inherit project test;
@@ -55,7 +61,8 @@
           buildInputs = with pkgs; [
             leanPkgs.lean
           ];
-          LEAN_PATH = "${leanPkgs.Lean.modRoot}";
+          LEAN_PATH = joinDepsDerivations (d: d.modRoot);
+          LEAN_SRC_PATH = joinDepsDerivations (d: d.src);
         };
       });
 }
