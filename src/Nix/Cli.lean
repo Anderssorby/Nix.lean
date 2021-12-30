@@ -1,10 +1,13 @@
 import Nix
 
 open Nix
+open System
 
 def main (args : List String) : IO UInt32 := do
   try
-    (match parse "{\"hello\" = \"world\"; \"test\"={\"a\" = 1;};}" with
+    let file := FilePath.mk <| args.get! 0 
+    let src ← IO.FS.readFile file
+    (match parse src with
     | Except.ok expr => IO.println <| ToString.toString expr
     | Except.error e => println! "Error: {e}"
     )

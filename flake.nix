@@ -39,6 +39,11 @@
           # Where the lean files are located
           src = ./src;
         };
+        cli = leanPkgs.buildLeanPackage {
+          name = "Nix.Cli";
+          deps = [ project ];
+          src = ./src;
+        };
         test = leanPkgs.buildLeanPackage {
           name = "Tests";
           deps = [ project ];
@@ -51,12 +56,14 @@
       {
         inherit project test;
         packages = {
-          ${name} = project.executable;
+          ${name} = project.sharedLib;
+          cli = cli.executable;
+          test = test.executable;
         };
 
         checks.test = test.executable;
 
-        defaultPackage = self.packages.${system}.${name};
+        defaultPackage = self.packages.${system}.cli;
         devShell = pkgs.mkShell {
           buildInputs = with pkgs; [
             leanPkgs.lean
