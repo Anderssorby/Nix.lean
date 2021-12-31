@@ -10,6 +10,7 @@ open Std
 
 def Name := String
 deriving instance BEq for Name
+deriving instance ToString for Name
 
 deriving instance Hashable for Name
 
@@ -143,12 +144,19 @@ inductive Operator where
   | merge -- //
   | or -- or
   | and -- and
+  | add -- +
+  | append -- ++
+  | minus -- -
+  | mul -- *
+
 
 inductive Expr where
-  | lam (binding : BVar) (body : Expr) -- $BVar: $Expr
-  | letExpr (vars : Array (Prod Name Expr))
+  | lam (binding : Name) (body : Expr) -- $BVar: $Expr
+  | ifStatement (e : Expr) (trueCase : Expr) (falseCase : Expr)
+  | letExpr (vars : Array (Prod Name Expr)) (inExpr : Expr)
   | app (f : Expr) (arg : Expr)
   | attrset (kvPairs : RBNode String (fun _ => Expr))
+  | fvar (name : Name)
   | list (l : Array Expr)
   | str (s : String)
   | opr (left : Expr) (op : Operator) (right : Expr)
@@ -159,7 +167,6 @@ inductive Expr where
 
 protected partial def toString (e : Expr) : String :=
   match e with
-  | Expr.lam binding body => s!"lam: " ++ Nix.toString e
   | Expr.null => "null"
   | Expr.bool b => ToString.toString b
   | Expr.str s => s!"\"{s}\""
@@ -168,8 +175,21 @@ protected partial def toString (e : Expr) : String :=
       s ++ s!"{k} = {Nix.toString v};\n"
     ) "" kvPairs)
     ++ "}"
+  | Expr.list l => "[ " ++
+    (Array.foldl (fun s v =>
+      s ++ s!"{Nix.toString v} "
+    ) "" l)
+    ++ "]"
+  | Expr.lam n b => s!"{n}: {Nix.toString b}"
+  | Expr.ifStatement e t f => s!"if {Nix.toString e} then\n {Nix.toString e}\nelse\n{Nix.toString f}"
+  | Expr.letExpr vars inExpr => "let\n" ++
+    (Array.foldl (fun s (n, v) =>
+      s ++ s!"  {n} = {Nix.toString v};\n"
+    ) "" vars)
+    ++ s!"in\n  {Nix.toString inExpr}\n"
   | Expr.num n => ToString.toString n
-  | _ => "undef"
+  | Expr.fvar n => ToString.toString n
+  | _ => "TODO print"
   -- termination_by measure e
 
 instance : ToString Expr := ⟨Nix.toString⟩

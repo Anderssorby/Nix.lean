@@ -35,7 +35,7 @@ instance : Monad Parsec :=
   { pure := Parsec.pure, bind }
 
 @[inline]
-def map {α β : Type} (p : Parsec α) (f : α → β) : Parsec β := do f (← p)
+def map {α β : Type} (f : α → β) (p : Parsec α) : Parsec β := do f (← p)
 
 @[inline]
 def andAppend {α : Type} [Append α] (f : Parsec α) (g : Parsec α) : Parsec α := do 
@@ -49,6 +49,8 @@ instance {α : Type} [Append α] : Append $ Parsec α := ⟨andAppend⟩
 def fail (msg : String) : Parsec α := fun it =>
   error it msg
 
+@[inline]
+def never : Parsec Unit := fun it => error it ""
 /-
 Combine two parsers into one where the first takes presedence
 and the second is tried if the first one fails.
@@ -68,6 +70,9 @@ def option (p : Parsec α) : Parsec $ Option α := fun it =>
   | success rem a => success rem (some a)
   | error rem err => success rem (none)
 
+/-
+Try to match but rewind iterator if failure and return success bool
+-/
 def test (p : Parsec α) : Parsec Bool := fun it =>
   match p it with
   | success rem a => success rem true
@@ -188,20 +193,26 @@ def symbol : Parsec String := attempt do
 
 
 @[inline]
-def satisfy (p : Char → Bool) : Parsec Char := attempt do
+def satisfy (p : Char → Bool) (msg : String := "condition not satisfied") : Parsec Char := attempt do
   let c ← anyChar
-  if p c then c else fail "condition not satisfied"
+  if p c then c else fail msg
 
 @[inline]
 def notFollowedBy (p : Parsec α) : Parsec Unit := λ it =>
   match p it with
-  | success _ _ => error it ""
+  | success _ _ => error it "unexpected symbol"
   | error _ _ => success it ()
 
+def isWhitespace (c : Char) : Bool :=
+  c = '\u0009' ∨ c = '\u000a' ∨ c = '\u000d' ∨ c = '\u0020'
+
+/-
+Non strict whitespace
+-/
 partial def skipWs (it : String.Iterator) : String.Iterator :=
   if it.hasNext then
     let c := it.curr
-    if c = '\u0009' ∨ c = '\u000a' ∨ c = '\u000d' ∨ c = '\u0020' then
+    if isWhitespace c then
       skipWs it.next
     else
       it
@@ -226,8 +237,18 @@ def peek! : Parsec Char := do
 def skip : Parsec Unit := fun it =>
   success it.next ()
 
+/-
+Zero or more whitespaces
+-/
 @[inline]
 def ws : Parsec Unit := fun it =>
   success (skipWs it) ()
+
+/-
+One or more whitespaces
+-/
+def wsStrict : Parsec Unit := do
+  _ ← satisfy isWhitespace
+  ws
   
 end Parsec

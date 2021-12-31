@@ -36,24 +36,23 @@ def escapedChar : Parsec Char := do
     Char.ofNat $ 4096*u1 + 256*u2 + 16*u3 + u4
   | _ => fail "illegal \\u escape"
 
-partial def stringLitteral (acc : String := "") : Parsec String := do
-  let c ← peek!
-  if c = '"' then -- "
-    skip
-    acc
-  else
+partial def stringLitteral : Parsec String := do
+  skipChar '"'
+  let rec internal : String → Parsec String := λ acc => do 
     let c ← anyChar
-    let ec ←
+    if c = '"' then
+      return acc
+    else
       if c = '\\' then
-        escapedChar
+        internal <| acc.push (← escapedChar)
       -- as to whether c.val > 0xffff should be split up and encoded with multiple \u,
       -- the JSON standard is not definite: both directly printing the character
       -- and encoding it with multiple \u is allowed. we choose the former.
       else if 0x0020 ≤ c.val ∧ c.val ≤ 0x10ffff then
-        c
+        internal <| acc.push c
       else
         fail "unexpected character in string"
-    stringLitteral (acc.push ec)
+  internal ""
 
 partial def natCore (acc digits : Nat) : Parsec (Nat × Nat) := do
   let some c ← peek? | (acc, digits)
@@ -129,76 +128,175 @@ def num : Parsec Number := do
       res.shiftl n
   else
     res
+
+def reservedWords := #[ "let", "with", "in", "if", "then", "else", "inherit", "rec" ]
+
+@[inline]
+def name : Parsec String := attempt do
+  notFollowedBy <| Array.foldl (λ (p : Parsec Unit) s => p <|> skipString s) never reservedWords
+  let starters := List.foldl (λ p c => p <|> pchar c) asciiLetter ['_', '$']
+  let c ← starters
+  let rest ← manyChars (starters <|> digit)
+  return s!"{c}{rest}"
+
 mutual
-partial def list (acc : Array Expr) : Parsec (Array Expr) := do
-  let hd ← expression
-  let acc' := acc.push hd
-  let c ← anyChar
-  if c = ']' then
-    acc'
-  else
-    list acc'
+partial def list : Parsec Expr := do
+  skipChar '['
+  let l ← many expression
+  skipChar ']'
+  Expr.list l
 
-partial def attrset : Parsec (RBNode String (fun _ => Expr)) := do
-  ws
-  let c ← anyChar
-  if c = '"' then
-    let k ← stringLitteral ""
-    ws
-    skipString "="
-    ws
-    let v ← expression
-    ws
-    skipString ";"
-    let kvs ← attrset
-    kvs.insert compare k v
-  else if c = '}' then
-    RBNode.leaf
-  else
-    fail s!"unexpected character {c} in attrset"
 
--- takes a unit parameter so that
--- we can use the equation compiler and recursion
-partial def expression : Parsec Expr := do
-  let c ← peek!
-  if c = '[' then
-    skip; ws
-    let c ← peek!
-    if c = ']' then
-      skip; ws
-      Expr.list (Array.mkEmpty 0)
+partial def attrset : Parsec Expr := do
+  skipChar '{'
+  let rec internal : Parsec (RBNode String (fun _ => Expr)) := do
+    if (← test <| skipChar '}') then
+      RBNode.leaf
     else
-      let a ← list (Array.mkEmpty 4)
-      Expr.list a
-  else if c = '{' then
-    skip; ws
-    let kvs ← attrset
-    Expr.attrset kvs
-  else if c = '\"' then
-    skip
-    let s ← stringLitteral
+      let k ← name <|> stringLitteral
+      ws
+      skipString "="
+      ws
+      let v ← expression
+      ws
+      skipString ";"
+      let kvs ← internal
+      kvs.insert compare k v
+  Expr.attrset (← internal)
+
+partial def litteral : Parsec Expr := do
+  let string := map Expr.str stringLitteral
+  let false := do
+      skipString "false"
+      ws
+      Expr.bool false
+  let true := do
+      skipString "true" 
+      ws
+      Expr.bool true 
+  let null := do
+      skipString "null"
+      ws
+      Expr.null
+  let number := do
+      let n ← num
+      ws
+      Expr.num n
+  string <|> false <|> true <|> null <|> map Expr.fvar name <|> number
+
+partial def ifStatement : Parsec Expr := do
+  skipString "if"
+  ws
+  let e ← expression
+  ws
+  skipString "then"
+  let t ← expression
+  skipString "else"
+  let f ← expression
+  Expr.ifStatement e t f
+
+partial def letStatement : Parsec Expr := do
+  let assignment : Parsec (Name × Expr) := do
     ws
-    Expr.str s
-  else if c = 'f' then
-    skipString "false"; ws
-    Expr.bool false
-  else if c = 't' then
-    skipString "true"; ws
-    Expr.bool true
-  else if c = 'n' then
-    skipString "null"; ws
-    Expr.null
-  else if c = '-' ∨ ('0' ≤ c ∧ c ≤ '9') then
-    let n ← num
+    let n ← name
     ws
-    Expr.num n
-  else
-    fail "unexpected input"
+    skipChar '='
+    ws
+    let ex ← expression
+    ws
+    skipChar ';'
+    ws
+    (n, ex)
+  skipString "let "
+  ws
+  let ass ← many1 assignment
+  ws
+  skipString "in "
+  ws
+  let ex ← expression
+  Expr.letExpr ass ex
+
+partial def lambda : Parsec Expr := do
+  let n ← name
+  ws
+  skipChar ':'
+  ws
+  let e ← expression
+  Expr.lam n e
+
+/-
+Function application e1 e2
+-/
+partial def app : Parsec Expr := do
+  let e1 ← recSafeExpression
+  ws
+  let e2 ← expression
+  Expr.app e1 e2
+
+partial def operator : Parsec Operator := do
+  let dot := do
+    skipChar '.'
+    Operator.dot
+  let merge := do
+    skipString "//"
+    Operator.merge
+  let or := do
+    skipString "or"
+    Operator.or
+  let and := do
+    skipString "and"
+    Operator.and
+  let append := do
+    skipChar '+'
+    Operator.add
+  let add := do
+    skipChar '+'
+    Operator.add
+  let minus := do
+    skipChar '-'
+    Operator.minus
+  let mul := do
+    skipChar '*'
+    Operator.mul
+  dot <|> merge <|> or <|> and <|> append <|> add <|> minus <|> mul
+
+
+/-
+Binary operation e1 `op` e2
+-/
+partial def operation : Parsec Expr := do
+  let e1 ← recSafeExpression
+  ws
+  let op ← operator
+  ws
+  let e2 ← expression
+  Expr.opr e1 op e2
+
+partial def recSafeExpression : Parsec Expr := do
+  litteral
+    <|> list
+    <|> attrset
+    <|> ifStatement
+    <|> letStatement
+    <|> lambda
+
+partial def expression : Parsec Expr := do
+  let wrappedExpression : Parsec Expr := do
+    skipChar '('
+    let e ← expression
+    skipChar ')'
+    e
+  ws
+  recSafeExpression
+    <|> operation
+    <|> app
+    <|> wrappedExpression
+
 end
 
 def any : Parsec Expr := do
   ws
-  let res ← expression()
+  let res ← expression
   eof
   res
 
