@@ -1,33 +1,41 @@
 
 namespace Parsec
+
+structure Pos where
+  it : String.Iterator
+  line : Nat := 1
+  lineOffset : Nat := 0
+  deriving Repr, BEq
+
 /-
 Result which keeps track of the parsing state.
 -/
 inductive ParseResult (α : Type) where
-  | success (pos : String.Iterator) (res : α)
-  | error (pos : String.Iterator) (err : String)
+  | success (pos : Pos) (res : α)
+  | error (pos : Pos) (err : String)
   deriving Repr
+
 end Parsec
 
 /-
 A function which converts an iterator to a ParseResult
 -/
-def Parsec (α : Type) : Type := String.Iterator → Parsec.ParseResult α
+def Parsec (α : Type) : Type := Parsec.Pos → Parsec.ParseResult α
 
 namespace Parsec
 
 open ParseResult
 
 instance (α : Type) : Inhabited (Parsec α) :=
-  ⟨λ it => error it ""⟩
+  ⟨λ pos => error pos ""⟩
 
 @[inline]
-protected def pure (a : α) : Parsec α := λ it =>
- success it a
+protected def pure (a : α) : Parsec α := λ pos =>
+ success pos a
 
 @[inline]
-def bind {α β : Type} (f : Parsec α) (g : α → Parsec β) : Parsec β := λ it =>
-  match f it with
+def bind {α β : Type} (f : Parsec α) (g : α → Parsec β) : Parsec β := λ pos =>
+  match f pos with
   | success rem a => g a rem
   | error pos msg => error pos msg
 
@@ -46,46 +54,61 @@ def andAppend {α : Type} [Append α] (f : Parsec α) (g : Parsec α) : Parsec �
 instance {α : Type} [Append α] : Append $ Parsec α := ⟨andAppend⟩
 
 @[inline]
-def fail (msg : String) : Parsec α := fun it =>
-  error it msg
+def fail (msg : String) : Parsec α := fun pos =>
+  error pos msg
 
 @[inline]
-def never : Parsec Unit := fun it => error it ""
+def never : Parsec Unit := fun pos => error pos ""
+
 /-
 Combine two parsers into one where the first takes presedence
 and the second is tried if the first one fails.
 -/
 @[inline]
-def orElse (p : Parsec α) (q : Unit → Parsec α) : Parsec α := fun it =>
-  match p it with
+def orElse (p : Parsec α) (q : Unit → Parsec α) : Parsec α := fun pos =>
+  match p pos with
   | success rem a => success rem a
   | error rem err =>
-    if it = rem then q () it else error rem err
+    if pos == rem then
+      q () pos
+    else
+      error rem err
+
+def isNewline (c : Char) : Bool :=
+  c = '\n'
+
+def updatePosIt (pos : Pos) : Pos :=
+  if isNewline pos.it.curr then
+    {pos with it := pos.it.next, lineOffset := 0, line := pos.line + 1 }
+  else
+    {pos with it := pos.it.next, lineOffset := pos.lineOffset + 1 }
+
+def getPos : Parsec (Nat × Nat) := λ pos => success pos (pos.line, pos.lineOffset)
 
 /-
 Convert errors to none
 -/
-def option (p : Parsec α) : Parsec $ Option α := fun it =>
-  match p it with
+def option (p : Parsec α) : Parsec $ Option α := fun pos =>
+  match p pos with
   | success rem a => success rem (some a)
   | error rem err => success rem (none)
 
 /-
 Try to match but rewind iterator if failure and return success bool
 -/
-def test (p : Parsec α) : Parsec Bool := fun it =>
-  match p it with
+def test (p : Parsec α) : Parsec Bool := fun pos =>
+  match p pos with
   | success rem a => success rem true
-  | error rem err => success it false
+  | error rem err => success pos false
 
 /-
 Rewind the iterator on failure
 -/
 @[inline]
-def attempt (p : Parsec α) : Parsec α := λ it =>
-  match p it with
+def attempt (p : Parsec α) : Parsec α := λ pos =>
+  match p pos with
   | success rem res => success rem res
-  | error _ err => error it err
+  | error _ err => error pos err
 
 instance : Alternative Parsec :=
 { failure := fail "", orElse }
@@ -93,11 +116,11 @@ instance : Alternative Parsec :=
 def expectedEndOfInput := "expected end of input"
 
 @[inline]
-def eof : Parsec Unit := fun it =>
-  if it.hasNext then
-    error it expectedEndOfInput
+def eof : Parsec Unit := fun pos =>
+  if pos.it.hasNext then
+    error pos expectedEndOfInput
   else
-    success it ()
+    success pos ()
 
 @[inline]
 partial def manyCore (p : Parsec α) (acc : Array α) : Parsec $ Array α :=
@@ -145,12 +168,13 @@ Zero or more matching Strings
 @[inline]
 def manyStrings (p : Parsec String) : Parsec String := manyStringsCore p ""
 
-def pstring (s : String) : Parsec String := λ it =>
-  let substr := it.extract (it.forward s.length)
+def pstring (s : String) : Parsec String := λ pos =>
+  let substr := pos.it.extract (pos.it.forward s.length)
   if substr = s then
-    success (it.forward s.length) substr
+    let it := pos.it.forward s.length
+    success ({pos with it}) substr
   else
-    error it s!"expected: {s}"
+    error pos s!"expected: {s}"
 
 @[inline]
 def skipString (s : String) : Parsec Unit := pstring s *> pure ()
@@ -158,8 +182,11 @@ def skipString (s : String) : Parsec Unit := pstring s *> pure ()
 def unexpectedEndOfInput := "unexpected end of input"
 
 @[inline]
-def anyChar : Parsec Char := λ it =>
-  if it.hasNext then success it.next it.curr else error it unexpectedEndOfInput
+def anyChar : Parsec Char := λ pos =>
+  if pos.it.hasNext then
+    success (updatePosIt pos) pos.it.curr
+  else
+    error pos unexpectedEndOfInput
 
 @[inline]
 def pchar (c : Char) : Parsec Char := attempt do
@@ -198,10 +225,10 @@ def satisfy (p : Char → Bool) (msg : String := "condition not satisfied") : Pa
   if p c then c else fail msg
 
 @[inline]
-def notFollowedBy (p : Parsec α) : Parsec Unit := λ it =>
-  match p it with
-  | success _ _ => error it "unexpected symbol"
-  | error _ _ => success it ()
+def notFollowedBy (p : Parsec α) : Parsec Unit := λ pos =>
+  match p pos with
+  | success _ _ => error pos "unexpected symbol"
+  | error _ _ => success pos ()
 
 def isWhitespace (c : Char) : Bool :=
   c = '\u0009' ∨ c = '\u000a' ∨ c = '\u000d' ∨ c = '\u0020'
@@ -209,24 +236,22 @@ def isWhitespace (c : Char) : Bool :=
 /-
 Non strict whitespace
 -/
-partial def skipWs (it : String.Iterator) : String.Iterator :=
-  if it.hasNext then
-    let c := it.curr
+partial def skipWs : Parsec Unit := λ pos =>
+  if pos.it.hasNext then
+    let c := pos.it.curr
     if isWhitespace c then
-      skipWs it.next
+      skipWs <| updatePosIt pos
     else
-      it
+      success pos ()
   else
-   it
-
-
+   success pos ()
 
 @[inline]
-def peek? : Parsec (Option Char) := fun it =>
-  if it.hasNext then
-    success it it.curr
+def peek? : Parsec (Option Char) := fun pos =>
+  if pos.it.hasNext then
+    success pos pos.it.curr
   else
-    success it none
+    success pos none
 
 @[inline]
 def peek! : Parsec Char := do
@@ -234,15 +259,14 @@ def peek! : Parsec Char := do
   c
 
 @[inline]
-def skip : Parsec Unit := fun it =>
-  success it.next ()
+def skip : Parsec Unit := fun pos =>
+  success pos ()
 
 /-
 Zero or more whitespaces
 -/
 @[inline]
-def ws : Parsec Unit := fun it =>
-  success (skipWs it) ()
+def ws : Parsec Unit := skipWs
 
 /-
 One or more whitespaces

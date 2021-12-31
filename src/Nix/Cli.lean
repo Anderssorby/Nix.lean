@@ -9,10 +9,10 @@ def main (args : List String) : IO UInt32 := do
     let src ← IO.FS.readFile file
     (match parse src with
     | Except.ok expr => IO.println <| ToString.toString expr
-    | Except.error e => println! "Error: {e}"
+    | Except.error e => IO.eprintln s!"Error: {e}"
     )
     pure 0
   catch e =>
-    IO.eprintln <| "error: " ++ toString e -- avoid "uncaught exception: ..."
+    IO.eprintln <| "Error: " ++ toString e -- avoid "uncaught exception: ..."
     pure 1
 

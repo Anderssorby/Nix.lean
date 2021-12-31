@@ -149,13 +149,16 @@ inductive Operator where
   | minus -- -
   | mul -- *
 
+structure Position where
+  start : (Nat × Nat)
+  end_ : (Nat × Nat)
 
 inductive Expr where
   | lam (binding : Name) (body : Expr) -- $BVar: $Expr
   | ifStatement (e : Expr) (trueCase : Expr) (falseCase : Expr)
   | letExpr (vars : Array (Prod Name Expr)) (inExpr : Expr)
   | app (f : Expr) (arg : Expr)
-  | attrset (kvPairs : RBNode String (fun _ => Expr))
+  | attrset (rec : Bool) (kvPairs : RBNode String (fun _ => Expr))
   | fvar (name : Name)
   | list (l : Array Expr)
   | str (s : String)
@@ -164,13 +167,16 @@ inductive Expr where
   | null
   | bool (b : Bool)
   | num (n : Number)
+  -- Meta info
+  | meta (pos : Position) (docs : Option String) (e : Expr)
 
 protected partial def toString (e : Expr) : String :=
   match e with
   | Expr.null => "null"
   | Expr.bool b => ToString.toString b
   | Expr.str s => s!"\"{s}\""
-  | Expr.attrset kvPairs => "{\n" ++
+  | Expr.attrset rec kvPairs => (if rec then "rec " else "")
+    ++ "{\n" ++
     (RBNode.fold (fun s k v =>
       s ++ s!"{k} = {Nix.toString v};\n"
     ) "" kvPairs)
@@ -189,6 +195,7 @@ protected partial def toString (e : Expr) : String :=
     ++ s!"in\n  {Nix.toString inExpr}\n"
   | Expr.num n => ToString.toString n
   | Expr.fvar n => ToString.toString n
+  | Expr.meta pos doc e => Nix.toString e
   | _ => "TODO print"
   -- termination_by measure e
 

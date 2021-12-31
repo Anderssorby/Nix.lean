@@ -132,39 +132,16 @@ def num : Parsec Number := do
 def reservedWords := #[ "let", "with", "in", "if", "then", "else", "inherit", "rec" ]
 
 @[inline]
-def name : Parsec String := attempt do
+def name : Parsec String := do
   notFollowedBy <| Array.foldl (λ (p : Parsec Unit) s => p <|> skipString s) never reservedWords
   let starters := List.foldl (λ p c => p <|> pchar c) asciiLetter ['_', '$']
   let c ← starters
   let rest ← manyChars (starters <|> digit)
   return s!"{c}{rest}"
 
-mutual
-partial def list : Parsec Expr := do
-  skipChar '['
-  let l ← many expression
-  skipChar ']'
-  Expr.list l
+def fvar : Parsec Expr := map Expr.fvar name
 
-
-partial def attrset : Parsec Expr := do
-  skipChar '{'
-  let rec internal : Parsec (RBNode String (fun _ => Expr)) := do
-    if (← test <| skipChar '}') then
-      RBNode.leaf
-    else
-      let k ← name <|> stringLitteral
-      ws
-      skipString "="
-      ws
-      let v ← expression
-      ws
-      skipString ";"
-      let kvs ← internal
-      kvs.insert compare k v
-  Expr.attrset (← internal)
-
-partial def litteral : Parsec Expr := do
+def litteral : Parsec Expr := do
   let string := map Expr.str stringLitteral
   let false := do
       skipString "false"
@@ -182,7 +159,36 @@ partial def litteral : Parsec Expr := do
       let n ← num
       ws
       Expr.num n
-  string <|> false <|> true <|> null <|> map Expr.fvar name <|> number
+  string <|> false <|> true <|> null <|> number
+
+mutual
+partial def list : Parsec Expr := do
+  skipChar '['
+  let l ← many expression
+  skipChar ']'
+  Expr.list l
+
+
+partial def attrset : Parsec Expr := do
+  let isRec ← test <| skipString "rec"
+  ws
+  skipChar '{'
+  let rec internal : Parsec (RBNode String (fun _ => Expr)) := do
+    ws
+    if (← test <| skipChar '}') then
+      RBNode.leaf
+    else
+      let k ← name <|> stringLitteral
+      ws
+      skipString "="
+      ws
+      let v ← expression
+      ws
+      skipString ";"
+      ws
+      let kvs ← internal
+      kvs.insert compare k v
+  Expr.attrset isRec (← internal)
 
 partial def ifStatement : Parsec Expr := do
   skipString "if"
@@ -198,6 +204,9 @@ partial def ifStatement : Parsec Expr := do
 partial def letStatement : Parsec Expr := do
   let assignment : Parsec (Name × Expr) := do
     ws
+    let com ← option <| manyStrings comment
+    ws
+    let start ← getPos
     let n ← name
     ws
     skipChar '='
@@ -205,13 +214,14 @@ partial def letStatement : Parsec Expr := do
     let ex ← expression
     ws
     skipChar ';'
+    let end_ ← getPos
     ws
-    (n, ex)
-  skipString "let "
+    (n, Expr.meta {start, end_} com ex)
+  skipString "let"
   ws
   let ass ← many1 assignment
   ws
-  skipString "in "
+  skipString "in"
   ws
   let ex ← expression
   Expr.letExpr ass ex
@@ -223,6 +233,11 @@ partial def lambda : Parsec Expr := do
   ws
   let e ← expression
   Expr.lam n e
+
+partial def comment : Parsec String := do
+  ws
+  skipChar '#'
+  manyChars <| satisfy (λ c => c != '\n')
 
 /-
 Function application e1 e2
@@ -273,24 +288,26 @@ partial def operation : Parsec Expr := do
   Expr.opr e1 op e2
 
 partial def recSafeExpression : Parsec Expr := do
-  litteral
-    <|> list
-    <|> attrset
-    <|> ifStatement
-    <|> letStatement
-    <|> lambda
-
-partial def expression : Parsec Expr := do
   let wrappedExpression : Parsec Expr := do
     skipChar '('
     let e ← expression
     skipChar ')'
     e
+  litteral
+    <|> list
+    <|> attrset
+    <|> ifStatement
+    <|> letStatement
+    <|> wrappedExpression
+
+partial def expression : Parsec Expr := do
+  let com ← option <| manyStrings comment
   ws
   recSafeExpression
     <|> operation
     <|> app
-    <|> wrappedExpression
+    <|> lambda
+    <|> fvar
 
 end
 
@@ -305,8 +322,8 @@ end Nix.Parser
 namespace Nix
 
 def parse (s : String) : Except String Nix.Expr :=
-  match Nix.Parser.any s.mkIterator with
+  match Nix.Parser.any { it := s.mkIterator : Parsec.Pos } with
   | Parsec.ParseResult.success _ res => Except.ok res
-  | Parsec.ParseResult.error it err  => Except.error s!"offset {it.i.repr}: {err}"
+  | Parsec.ParseResult.error pos err  => Except.error s!"{err} ({pos.line}:{pos.lineOffset})"
 
 end Nix
