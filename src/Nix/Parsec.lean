@@ -68,16 +68,23 @@ and the second is tried if the first one fails.
 def orElse (p : Parsec α) (q : Unit → Parsec α) : Parsec α := fun pos =>
   match p pos with
   | success rem a => success rem a
-  | error rem err =>
-    if pos == rem then
-      q () pos
-    else
-      error rem err
+  | error rem err => 
+    match q () pos with
+    | error rem2 err2 =>
+      -- Forward the error of the longest match
+      if rem.it.i = rem2.it.i then
+        error rem s!"{err} or {err2}"
+      else if rem.it.i > rem2.it.i then
+        error rem err
+      else
+        error rem2 err2
+    | success rem a => success rem a
+
 
 def isNewline (c : Char) : Bool :=
   c = '\n'
 
-def updatePosIt (pos : Pos) : Pos :=
+def nextPosIt (pos : Pos) : Pos :=
   if isNewline pos.it.curr then
     {pos with it := pos.it.next, lineOffset := 0, line := pos.line + 1 }
   else
@@ -91,7 +98,7 @@ Convert errors to none
 def option (p : Parsec α) : Parsec $ Option α := fun pos =>
   match p pos with
   | success rem a => success rem (some a)
-  | error rem err => success rem (none)
+  | error rem err => success pos (none)
 
 /-
 Try to match but rewind iterator if failure and return success bool
@@ -123,9 +130,11 @@ def eof : Parsec Unit := fun pos =>
     success pos ()
 
 @[inline]
-partial def manyCore (p : Parsec α) (acc : Array α) : Parsec $ Array α :=
-  (do manyCore p (acc.push $ ←p))
-  <|> pure acc
+partial def manyCore (p : Parsec α) (acc : Array α) : Parsec $ Array α := do
+  if let some res ← option p then
+    manyCore p (acc.push $ res)
+  else
+    acc
 
 @[inline]
 def many (p : Parsec α) : Parsec $ Array α := manyCore p #[]
@@ -134,9 +143,11 @@ def many (p : Parsec α) : Parsec $ Array α := manyCore p #[]
 def many1 (p : Parsec α) : Parsec $ Array α := do manyCore p #[←p]
 
 @[inline]
-partial def manyCharsCore (p : Parsec Char) (acc : String) : Parsec String :=
-  (do manyCharsCore p (acc.push $ ←p))
-  <|> pure acc
+partial def manyCharsCore (p : Parsec Char) (acc : String) : Parsec String := do
+  if let some res ← option p then
+    manyCharsCore p (acc.push $ res)
+  else
+    acc
 
 /-
 Zero or more matching chars
@@ -184,7 +195,7 @@ def unexpectedEndOfInput := "unexpected end of input"
 @[inline]
 def anyChar : Parsec Char := λ pos =>
   if pos.it.hasNext then
-    success (updatePosIt pos) pos.it.curr
+    success (nextPosIt pos) pos.it.curr
   else
     error pos unexpectedEndOfInput
 
@@ -237,19 +248,16 @@ def isWhitespace (c : Char) : Bool :=
 Non strict whitespace
 -/
 partial def skipWs : Parsec Unit := λ pos =>
-  if pos.it.hasNext then
-    let c := pos.it.curr
-    if isWhitespace c then
-      skipWs <| updatePosIt pos
-    else
-      success pos ()
+  let c := pos.it.curr
+  if pos.it.hasNext && isWhitespace c then
+    skipWs <| nextPosIt pos
   else
-   success pos ()
+    success pos ()
 
 @[inline]
 def peek? : Parsec (Option Char) := fun pos =>
   if pos.it.hasNext then
-    success pos pos.it.curr
+    success (nextPosIt pos) pos.it.curr
   else
     success pos none
 

@@ -142,12 +142,25 @@ Builtin operators
 inductive Operator where
   | dot -- .
   | merge -- //
-  | or -- or
-  | and -- and
+  | or_ -- or
+  | and_ -- and
   | add -- +
   | append -- ++
   | minus -- -
   | mul -- *
+
+open Operator in
+instance : ToString Operator := ⟨λ op : Operator=>
+  match op with
+  | dot => "."
+  | merge => "//"
+  | or_ => "or"
+  | and_ => "and"
+  | add => "+"
+  | append => "++"
+  | minus => "-"
+  | mul => "*"
+  ⟩
 
 structure Position where
   start : (Nat × Nat)
@@ -156,6 +169,7 @@ structure Position where
 inductive Expr where
   | lam (binding : Name) (body : Expr) -- $BVar: $Expr
   | ifStatement (e : Expr) (trueCase : Expr) (falseCase : Expr)
+  | withStatement (with_ : Expr) (expr : Expr)
   | letExpr (vars : Array (Prod Name Expr)) (inExpr : Expr)
   | app (f : Expr) (arg : Expr)
   | attrset (rec : Bool) (kvPairs : RBNode String (fun _ => Expr))
@@ -164,16 +178,12 @@ inductive Expr where
   | str (s : String)
   | opr (left : Expr) (op : Operator) (right : Expr)
   -- Constants
-  | null
-  | bool (b : Bool)
   | num (n : Number)
   -- Meta info
   | meta (pos : Position) (docs : Option String) (e : Expr)
 
 protected partial def toString (e : Expr) : String :=
   match e with
-  | Expr.null => "null"
-  | Expr.bool b => ToString.toString b
   | Expr.str s => s!"\"{s}\""
   | Expr.attrset rec kvPairs => (if rec then "rec " else "")
     ++ "{\n" ++
@@ -187,6 +197,7 @@ protected partial def toString (e : Expr) : String :=
     ) "" l)
     ++ "]"
   | Expr.lam n b => s!"{n}: {Nix.toString b}"
+  | Expr.withStatement w e => s!"with {Nix.toString w}; {Nix.toString e}"
   | Expr.ifStatement e t f => s!"if {Nix.toString e} then\n {Nix.toString e}\nelse\n{Nix.toString f}"
   | Expr.letExpr vars inExpr => "let\n" ++
     (Array.foldl (fun s (n, v) =>
@@ -196,7 +207,9 @@ protected partial def toString (e : Expr) : String :=
   | Expr.num n => ToString.toString n
   | Expr.fvar n => ToString.toString n
   | Expr.meta pos doc e => Nix.toString e
-  | _ => "TODO print"
+  | Expr.opr l op r => s!"{Nix.toString l} {op} {Nix.toString r}"
+  | Expr.app f a => s!"{Nix.toString f} {Nix.toString a}"
+  -- | _ => "TODO print"
   -- termination_by measure e
 
 instance : ToString Expr := ⟨Nix.toString⟩
