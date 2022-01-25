@@ -1,10 +1,12 @@
 import Lean.Parser
 import Nix.Parsec
-import Nix.Expression
+import Nix.Expression.Types
 
 open Std (RBNode RBNode.singleton RBNode.leaf)
 
-namespace Nix.Parser
+namespace Nix.Expression
+
+namespace Parser
 
 open Parsec
 
@@ -302,13 +304,11 @@ def file : Parsec Expr := do
   eof
   res
 
-end Nix.Parser
-
-namespace Nix
+end Parser
 
 def parse (s : String) : Except String Nix.Expr :=
-  match Nix.Parser.file { it := s.mkIterator : Parsec.Pos } with
+  match Parser.file { it := s.mkIterator : Parsec.Pos } with
   | Parsec.ParseResult.success _ res => Except.ok res
   | Parsec.ParseResult.error pos err  => Except.error s!"{err} ({pos.line}:{pos.lineOffset})"
 
-end Nix
+end Nix.Expression
