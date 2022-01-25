@@ -1,4 +1,3 @@
-import Lean.Parser
 import Nix.Parsec
 import Nix.Expression.Types
 
