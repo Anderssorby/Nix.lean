@@ -1,4 +1,5 @@
 import Std
+import Nix.Utils
 namespace Nix
 open Std
 
@@ -7,6 +8,9 @@ structure StorePath where
   hash : String
   name : String := ""
   deriving BEq, Ord, Hashable
+
+instance : ToString StorePath where
+  toString sp := sp.hash
 
 /-
 A Nix derivation. Equivalent to a drv file.
@@ -29,6 +33,9 @@ structure Derivation where
     -- ^ Environment variables provided to the executable used to build the
     -- derivation
     -- deriving BEq, Ord
+
+instance : ToString Derivation where
+  toString d := s!"Derivation({d.outputs.toList},\n{d.inputDrvs.toList}\n)"
 
 namespace Derivation
 

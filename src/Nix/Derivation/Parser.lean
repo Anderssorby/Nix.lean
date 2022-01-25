@@ -1,4 +1,5 @@
 import Std
+import Nix.Utils
 import Nix.Derivation.Types
 import Nix.Parsec
 
