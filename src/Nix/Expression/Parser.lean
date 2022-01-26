@@ -300,6 +300,7 @@ end
 def file : Parsec Expr := do
   ws
   let res ← expression
+  ws
   eof
   res
 
