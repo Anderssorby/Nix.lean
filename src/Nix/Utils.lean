@@ -1,6 +1,8 @@
 import Std
 open Std
+open System
 
+namespace Std
 instance (V : Type) [ToString V] [BEq V] [Hashable V] : ToString <| HashSet V where
   toString s := s.toList.toString
 
@@ -16,3 +18,15 @@ instance {V : Type} [BEq V] [Hashable V] : Hashable <| HashSet V where
 
 instance {V : Type} [BEq V] [Hashable V] : BEq <| HashSet V where
   beq a b := a.toList ==  b.toList
+
+end Std
+
+namespace System
+
+def FilePath.findAllWithExt (p : FilePath) (ext : String) : IO (Array FilePath) := do
+  if (← p.isDir) then
+    (← p.walkDir).filter (·.extension == some ext)
+  else
+    #[]
+
+end System

@@ -1,11 +1,12 @@
 import Nix
+import Nix.Utils
 
 open Nix
 open System
 
 def main (args : List String) : IO UInt32 := do
   try
-    let files := List.map FilePath.mk [ "test/basic_array.nix", "test/attrset.nix", "test/let.nix" ]
+    let files ← (FilePath.mk "test/nix").findAllWithExt "nix"
     let srcs ← files.mapM (λ fp => do (fp, ←IO.FS.readFile fp))
     for (fp, src) in srcs do
       println! "Parsing {fp}"
