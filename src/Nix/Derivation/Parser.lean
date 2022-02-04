@@ -139,8 +139,6 @@ def derivation : Parsec Derivation := do
 end Parser
 
 def parse (s : String) : Except String Nix.Derivation :=
-  match Parser.derivation { it := s.mkIterator : Parsec.Pos } with
-  | Parsec.ParseResult.success _ res => Except.ok res
-  | Parsec.ParseResult.error pos err  => Except.error s!"{err} ({pos.line}:{pos.lineOffset})"
+  Parser.derivation.parse s
 
 end Nix.Derivation

@@ -4,6 +4,8 @@ import Nix.Utils
 open Nix
 open System
 
+-- #eval Expression.Parser.letStatement.parse "let\n a = \"\";\n in a"
+
 def main (args : List String) : IO UInt32 := do
   try
     let files ← (FilePath.mk "test/nix").findAllWithExt "nix"

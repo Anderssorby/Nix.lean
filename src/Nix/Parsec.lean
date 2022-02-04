@@ -10,9 +10,9 @@ structure Pos where
 /-
 Result which keeps track of the parsing state.
 -/
-inductive ParseResult (α : Type) where
+inductive ParseResult (E : Type) (α : Type) where
   | success (pos : Pos) (res : α)
-  | error (pos : Pos) (err : String)
+  | error (pos : Pos) (err : E)
   deriving Repr
 
 end Parsec
@@ -20,7 +20,7 @@ end Parsec
 /-
 A function which converts an iterator to a ParseResult
 -/
-def Parsec (α : Type) : Type := Parsec.Pos → Parsec.ParseResult α
+def Parsec (α : Type) : Type := Parsec.Pos → Parsec.ParseResult String α
 
 namespace Parsec
 
@@ -282,5 +282,10 @@ One or more whitespaces
 def wsStrict : Parsec Unit := do
   _ ← satisfy isWhitespace
   ws
-  
+
+def parse {A: Type} (p: Parsec A) (s : String) : Except String A :=
+  match p { it := s.mkIterator : Parsec.Pos } with
+  | Parsec.ParseResult.success _ res => Except.ok res
+  | Parsec.ParseResult.error pos err  => Except.error s!"{err} ({pos.line}:{pos.lineOffset})"
+
 end Parsec

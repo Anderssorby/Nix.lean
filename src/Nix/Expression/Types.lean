@@ -13,6 +13,7 @@ deriving instance BEq for Name
 deriving instance ToString for Name
 
 deriving instance Hashable for Name
+deriving instance Ord for Name
 
 -- mantissa * 10^-exponent
 structure Number where
@@ -135,6 +136,7 @@ Bound variable
 inductive BVar where
   | var (name: Name) -- $Name: $Expr
   | destruct (d: List Name) -- { $Name,* }:
+  deriving BEq
 
 /-
 Builtin operators
@@ -148,9 +150,10 @@ inductive Operator where
   | append -- ++
   | minus -- -
   | mul -- *
+  deriving Ord, BEq
 
 open Operator in
-instance : ToString Operator := ⟨λ op : Operator=>
+instance : ToString Operator := ⟨λ op : Operator =>
   match op with
   | dot => "."
   | merge => "//"
@@ -165,6 +168,14 @@ instance : ToString Operator := ⟨λ op : Operator=>
 structure Position where
   start : (Nat × Nat)
   end_ : (Nat × Nat)
+  deriving BEq
+
+mutual
+
+inductive AttrSetKey where
+  | name (name : Expr)
+  | expr (arr : Array Expr)
+  deriving BEq
 
 inductive Expr where
   | lam (binding : Name) (body : Expr) -- $BVar: $Expr
@@ -172,7 +183,7 @@ inductive Expr where
   | withStatement (with_ : Expr) (expr : Expr)
   | letExpr (vars : Array (Prod Name Expr)) (inExpr : Expr)
   | app (f : Expr) (arg : Expr)
-  | attrset (rec : Bool) (kvPairs : RBNode String (fun _ => Expr))
+  | attrset (rec : Bool) (kvPairs : List (AttrSetKey × Expr))
   | fvar (name : Name)
   | list (l : Array Expr)
   | str (s : String)
@@ -181,35 +192,49 @@ inductive Expr where
   | num (n : Number)
   -- Meta info
   | meta (pos : Position) (docs : Option String) (e : Expr)
+  deriving BEq
 
-protected partial def toString (e : Expr) : String :=
+end
+
+mutual
+
+private partial def AttrSetKey_toString (a : AttrSetKey) : String :=
+  match a with
+  | AttrSetKey.name n => Expr_toString n
+  | AttrSetKey.expr arr => ".".intercalate <| arr.toList.map Expr_toString
+
+private partial def Expr_toString (e : Expr) : String :=
   match e with
   | Expr.str s => s!"\"{s}\""
   | Expr.attrset rec kvPairs => (if rec then "rec " else "")
     ++ "{\n" ++
-    (RBNode.fold (fun s k v =>
-      s ++ s!"{k} = {Nix.toString v};\n"
+    (List.foldl (fun s (k, v) =>
+      s ++ s!"{AttrSetKey_toString k} = {Expr_toString v};\n"
     ) "" kvPairs)
     ++ "}"
   | Expr.list l => "[ " ++
     (Array.foldl (fun s v =>
-      s ++ s!"{Nix.toString v} "
+      s ++ s!"{Expr_toString v} "
     ) "" l)
     ++ "]"
-  | Expr.lam n b => s!"{n}: {Nix.toString b}"
-  | Expr.withStatement w e => s!"with {Nix.toString w}; {Nix.toString e}"
-  | Expr.ifStatement e t f => s!"if {Nix.toString e} then\n {Nix.toString e}\nelse\n{Nix.toString f}"
+  | Expr.lam n b => s!"{n}: {Expr_toString b}"
+  | Expr.withStatement w e => s!"with {Expr_toString w}; {Expr_toString e}"
+  | Expr.ifStatement e t f => s!"if {Expr_toString e} then\n {Expr_toString e}\nelse\n{Expr_toString f}"
   | Expr.letExpr vars inExpr => "let\n" ++
     (Array.foldl (fun s (n, v) =>
-      s ++ s!"  {n} = {Nix.toString v};\n"
+      s ++ s!"  {n} = {Expr_toString v};\n"
     ) "" vars)
-    ++ s!"in\n  {Nix.toString inExpr}\n"
+    ++ s!"in\n  {Expr_toString inExpr}\n"
   | Expr.num n => ToString.toString n
   | Expr.fvar n => ToString.toString n
-  | Expr.meta pos doc e => Nix.toString e
-  | Expr.opr l op r => s!"{Nix.toString l} {op} {Nix.toString r}"
-  | Expr.app f a => s!"{Nix.toString f} {Nix.toString a}"
+  | Expr.meta pos doc e => Expr_toString e
+  | Expr.opr l op r => s!"{Expr_toString l} {op} {Expr_toString r}"
+  | Expr.app f a => s!"{Expr_toString f} {Expr_toString a}"
   -- | _ => "TODO print"
   -- termination_by measure e
+end
 
-instance : ToString Expr := ⟨Nix.toString⟩
+instance : ToString AttrSetKey := ⟨AttrSetKey_toString⟩
+instance : ToString Expr := ⟨Expr_toString⟩
+
+end Nix

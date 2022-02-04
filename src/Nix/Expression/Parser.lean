@@ -143,6 +143,25 @@ def operator : Parsec Operator := do
   dot <|> merge <|> or <|> and <|> append <|> add <|> minus <|> mul
 
 mutual
+
+partial def stringInterpolation : Parsec Expr := do
+  skipChar '$'
+  skipChar '{'
+  let e ← expression
+  skipChar '}'
+  e
+
+partial def attrSetKey : Parsec AttrSetKey := do
+  let part := (Expr.fvar <$> name) <|> (Expr.str <$> stringLitteral) <|> stringInterpolation
+  let first ← part
+  let rest : Array Expr ← many do
+    skipChar '.'
+    part
+  if rest.isEmpty then
+    AttrSetKey.name first
+  else
+    AttrSetKey.expr (first :: rest.toList).toArray
+
 partial def list : Parsec Expr := do
   skipChar '['
   let l ← many expression
@@ -153,12 +172,12 @@ partial def attrset : Parsec Expr := do
   let isRec ← test <| skipString "rec"
   ws
   skipChar '{'
-  let rec internal : Parsec (RBNode String (fun _ => Expr)) := do
+  let rec internal : Parsec (List (AttrSetKey × Expr)) := do
     ws
     if (← test <| skipChar '}') then
-      RBNode.leaf
+      []
     else
-      let k ← name <|> stringLitteral
+      let k ← attrSetKey
       ws
       skipString "="
       ws
@@ -167,7 +186,7 @@ partial def attrset : Parsec Expr := do
       skipString ";"
       ws
       let kvs ← internal
-      kvs.insert compare k v
+      kvs.append [(k, v)]
   Expr.attrset isRec (← internal)
 
 partial def ifStatement : Parsec Expr := do
@@ -306,9 +325,6 @@ def file : Parsec Expr := do
 
 end Parser
 
-def parse (s : String) : Except String Nix.Expr :=
-  match Parser.file { it := s.mkIterator : Parsec.Pos } with
-  | Parsec.ParseResult.success _ res => Except.ok res
-  | Parsec.ParseResult.error pos err  => Except.error s!"{err} ({pos.line}:{pos.lineOffset})"
+def parse (s : String) : Except String Nix.Expr := Parser.file.parse s
 
 end Nix.Expression
