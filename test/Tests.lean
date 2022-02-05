@@ -4,7 +4,13 @@ import Nix.Utils
 open Nix
 open System
 
--- #eval Expression.Parser.letStatement.parse "let\n a = \"\";\n in a"
+open Nix.Expression.Parser
+#print "Testing Expression.Parser"
+#eval letStatement.parse "let\n a = \"\";\n in a"
+
+#eval lambda.parse "arg: expr"
+#eval lambda.parse "{a ? 1}: a"
+#eval lambda.parse "{a ? 1, b, ...}: a"
 
 def main (args : List String) : IO UInt32 := do
   try

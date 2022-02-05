@@ -240,8 +240,10 @@ partial def letStatement : Parsec Expr := do
   Expr.letExpr ass ex
 
 partial def lambda : Parsec Expr := do
-  let part : Parsec (Name × Option Expr) := do
+  let rec varsp : Parsec <| List (Name × Option Expr) × Bool := do
     ws
+    if ← test <| skipString "..." then
+      return ([], true)
     let n ← name
     ws
     let optDef ← option <| do
@@ -249,22 +251,30 @@ partial def lambda : Parsec Expr := do
       ws
       expression
     ws
-    (n, optDef)
-  let destruct : Parsec (Array (Name × Option Expr) × Bool) := do
+    if ← test <| skipChar ',' then
+      let (l, ca) ← varsp
+      return ((n, optDef) :: l, ca)
+    else
+      return ([(n, optDef)], false)
+  let destruct : Parsec LBinding := do
+    let optName : Option Name ← option <| do
+      let n ← name
+      ws
+      skipChar '@'
+      ws
+      n
     skipChar '{'
     ws
-    let bs ← many part
-    ws
-    let catchAll ← test <| skipString "..."
+    let (vars, catchAll) ← varsp
     ws
     skipChar '}'
-    (bs, catchAll)
-  let n ← name
+    LBinding.destructure optName vars.toArray catchAll
+  let binding ← (LBinding.var <$> name) <|> destruct
   ws
   skipChar ':'
   ws
   let e ← expression
-  Expr.lam n e
+  Expr.lam binding e
 
 partial def comment : Parsec String := do
   ws

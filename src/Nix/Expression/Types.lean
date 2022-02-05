@@ -177,8 +177,18 @@ inductive AttrSetKey where
   | expr (arr : Array Expr)
   deriving BEq
 
+/--
+Binding of variables in a lambda.
+-/
+inductive LBinding where
+  | var (name : Name)
+  | destructure (name : Option Name) (vars : Array (Name × Option Expr)) (catchAll : Bool)
+
+/--
+Nix Expressions not desugared.
+-/
 inductive Expr where
-  | lam (binding : Name) (body : Expr) -- $BVar: $Expr
+  | lam (binding : LBinding) (body : Expr) -- $BVar: $Expr
   | ifStatement (e : Expr) (trueCase : Expr) (falseCase : Expr)
   | withStatement (with_ : Expr) (expr : Expr)
   | letExpr (vars : Array (Prod Name Expr)) (inExpr : Expr)
@@ -203,6 +213,19 @@ private partial def AttrSetKey_toString (a : AttrSetKey) : String :=
   | AttrSetKey.name n => Expr_toString n
   | AttrSetKey.expr arr => ".".intercalate <| arr.toList.map Expr_toString
 
+private partial def LBinding_toString (b : LBinding) : String :=
+  match b with
+  | LBinding.var n => ToString.toString n
+  | LBinding.destructure optName vars catchAll =>
+    (if let some d := optName then s!"{d}@" else "") ++
+    "{ " ++
+    (", ".intercalate <| vars.toList.map (fun (n, defVal) =>
+      ToString.toString n ++
+      (if let some d := defVal then " ? " ++ Expr_toString d else "")
+    )) ++
+    (if catchAll then ", ..." else "") ++
+    " }"
+
 private partial def Expr_toString (e : Expr) : String :=
   match e with
   | Expr.str s => s!"\"{s}\""
@@ -217,7 +240,7 @@ private partial def Expr_toString (e : Expr) : String :=
       s ++ s!"{Expr_toString v} "
     ) "" l)
     ++ "]"
-  | Expr.lam n b => s!"{n}: {Expr_toString b}"
+  | Expr.lam n b => s!"{LBinding_toString n}: {Expr_toString b}"
   | Expr.withStatement w e => s!"with {Expr_toString w}; {Expr_toString e}"
   | Expr.ifStatement e t f => s!"if {Expr_toString e} then\n {Expr_toString e}\nelse\n{Expr_toString f}"
   | Expr.letExpr vars inExpr => "let\n" ++
@@ -235,6 +258,7 @@ private partial def Expr_toString (e : Expr) : String :=
 end
 
 instance : ToString AttrSetKey := ⟨AttrSetKey_toString⟩
+instance : ToString LBinding := ⟨LBinding_toString⟩
 instance : ToString Expr := ⟨Expr_toString⟩
 
 end Nix
