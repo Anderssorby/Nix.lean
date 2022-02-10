@@ -43,7 +43,7 @@ instance : Monad Parsec :=
   { pure := Parsec.pure, bind }
 
 @[inline]
-def map {α β : Type} (f : α → β) (p : Parsec α) : Parsec β := do f (← p)
+def map {α β : Type} (f : α → β) (p : Parsec α) : Parsec β := p >>= pure ∘ f
 
 @[inline]
 def andAppend {α : Type} [Append α] (f : Parsec α) (g : Parsec α) : Parsec α := do 
@@ -51,7 +51,14 @@ def andAppend {α : Type} [Append α] (f : Parsec α) (g : Parsec α) : Parsec �
   let b ← g
   return a ++ b
 
+@[inline]
+def andHAppend {A B C : Type} [HAppend A B C] (f : Parsec A) (g : Parsec B) : Parsec C := do 
+  let a ← f
+  let b ← g
+  return a ++ b
+
 instance {α : Type} [Append α] : Append $ Parsec α := ⟨andAppend⟩
+instance {A B C : Type} [HAppend A B C] : HAppend (Parsec A) (Parsec B) (Parsec C) := ⟨andHAppend⟩
 
 @[inline]
 def fail (msg : String) : Parsec α := fun pos =>
@@ -134,7 +141,7 @@ partial def manyCore (p : Parsec α) (acc : Array α) : Parsec $ Array α := do
   if let some res ← option p then
     manyCore p (acc.push $ res)
   else
-    acc
+    pure acc
 
 @[inline]
 def many (p : Parsec α) : Parsec $ Array α := manyCore p #[]
@@ -147,7 +154,7 @@ partial def manyCharsCore (p : Parsec Char) (acc : String) : Parsec String := do
   if let some res ← option p then
     manyCharsCore p (acc.push $ res)
   else
-    acc
+    pure acc
 
 /-
 Zero or more matching chars
@@ -209,19 +216,19 @@ def skipChar (c : Char) : Parsec Unit := pchar c *> pure ()
 @[inline]
 def digit : Parsec Char := attempt do
   let c ← anyChar
-  if '0' ≤ c ∧ c ≤ '9' then c else fail s!"digit expected"
+  if '0' ≤ c ∧ c ≤ '9' then pure c else fail s!"digit expected"
 
 @[inline]
 def hexDigit : Parsec Char := attempt do
   let c ← anyChar
   if ('0' ≤ c ∧ c ≤ '9')
    ∨ ('a' ≤ c ∧ c ≤ 'a')
-   ∨ ('A' ≤ c ∧ c ≤ 'A') then c else fail s!"hex digit expected"
+   ∨ ('A' ≤ c ∧ c ≤ 'A') then pure c else fail s!"hex digit expected"
 
 @[inline]
 def asciiLetter : Parsec Char := attempt do
   let c ← anyChar
-  if ('A' ≤ c ∧ c ≤ 'Z') ∨ ('a' ≤ c ∧ c ≤ 'z') then c else fail s!"ASCII letter expected"
+  if ('A' ≤ c ∧ c ≤ 'Z') ∨ ('a' ≤ c ∧ c ≤ 'z') then pure c else fail s!"ASCII letter expected"
 
 @[inline]
 def symbol : Parsec String := attempt do
@@ -233,7 +240,7 @@ def symbol : Parsec String := attempt do
 @[inline]
 def satisfy (p : Char → Bool) (msg : String := "condition not satisfied") : Parsec Char := attempt do
   let c ← anyChar
-  if p c then c else fail msg
+  if p c then pure c else fail msg
 
 @[inline]
 def notFollowedBy (p : Parsec α) : Parsec Unit := λ pos =>
@@ -264,7 +271,7 @@ def peek? : Parsec (Option Char) := fun pos =>
 @[inline]
 def peek! : Parsec Char := do
   let some c ← peek? | fail unexpectedEndOfInput
-  c
+  pure c
 
 @[inline]
 def skip : Parsec Unit := fun pos =>
