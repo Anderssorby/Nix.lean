@@ -80,7 +80,7 @@ def orElse (p : Parsec α) (q : Unit → Parsec α) : Parsec α := fun pos =>
     | error rem2 err2 =>
       -- Forward the error of the longest match
       if rem.it.i = rem2.it.i then
-        error rem s!"{err} or {err2}"
+        error rem err
       else if rem.it.i > rem2.it.i then
         error rem err
       else

@@ -167,7 +167,7 @@ instance : ToString Operator := ⟨λ op : Operator =>
 
 structure Position where
   start : (Nat × Nat)
-  end_ : (Nat × Nat)
+  stop : (Nat × Nat)
   deriving BEq
 
 mutual

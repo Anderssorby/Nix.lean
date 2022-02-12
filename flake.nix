@@ -51,12 +51,14 @@
           src = ./test;
         };
         joinDepsDerivations = getSubDrv:
-          pkgs.lib.concatStringsSep ":" (map (d: (builtins.tryEval "${getSubDrv d}").value) ([ ] ++ project.allExternalDeps));
+          pkgs.lib.concatStringsSep ":" (map (d: (builtins.tryEval "${getSubDrv d}").value) (project.allExternalDeps));
       in
       {
         inherit project test;
         packages = {
           ${name} = project.sharedLib;
+          inherit (project) lean-package print-paths;
+          inherit (leanPkgs) lean;
           cli = cli.executable;
           test = test.executable;
         };
@@ -66,10 +68,10 @@
         defaultPackage = self.packages.${system}.cli;
         devShell = pkgs.mkShell {
           buildInputs = with pkgs; [
-            leanPkgs.lean
+            leanPkgs.lean-dev
           ];
-          LEAN_PATH = joinDepsDerivations (d: d.modRoot);
-          LEAN_SRC_PATH = "${./.}/src:" + joinDepsDerivations (d: d.src);
+          LEAN_PATH = "./src:./test";
+          LEAN_SRC_PATH = "./src:./test";
         };
       });
 }

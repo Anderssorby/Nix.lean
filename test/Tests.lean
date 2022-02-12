@@ -12,10 +12,12 @@ open Nix.Expression.Parser
 #eval lambda.parse "{a ? 1}: a"
 #eval lambda.parse "{a ? 1, b, ...}: a"
 
+#eval expression.parse "left.right {a}: a.b"
+
 def main (args : List String) : IO UInt32 := do
   try
     let files ← (FilePath.mk "test/nix").findAllWithExt "nix"
-    let srcs ← files.mapM (λ fp => do (fp, ←IO.FS.readFile fp))
+    let srcs ← files.mapM (λ fp => do pure (fp, ←IO.FS.readFile fp))
     for (fp, src) in srcs do
       println! "Parsing {fp}"
       match Expression.parse src with
@@ -23,6 +25,6 @@ def main (args : List String) : IO UInt32 := do
       | Except.error e => IO.eprintln s!"Error: {e}"
     pure 0
   catch e =>
-    IO.eprintln <| "error: " ++ toString e -- avoid "uncaught exception: ..."
+    IO.eprintln <| "error: " ++ toString e
     pure 1
 

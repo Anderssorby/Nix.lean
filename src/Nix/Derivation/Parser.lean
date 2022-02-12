@@ -28,17 +28,17 @@ def hexChar : Parsec Nat := do
 def escapedChar : Parsec Char := do
   let c ← anyChar
   match c with
-  | '\\' => '\\'
-  | '"'  => '"'
-  | '/'  => '/'
-  | 'b'  => '\x08'
-  | 'f'  => '\x0c'
-  | 'n'  => '\n'
-  | 'r'  => '\x0d'
-  | 't'  => '\t'
+  | '\\' => pure '\\'
+  | '"'  => pure '"'
+  | '/'  => pure '/'
+  | 'b'  => pure '\x08'
+  | 'f'  => pure '\x0c'
+  | 'n'  => pure '\n'
+  | 'r'  => pure '\x0d'
+  | 't'  => pure '\t'
   | 'u'  =>
     let u1 ← hexChar; let u2 ← hexChar; let u3 ← hexChar; let u4 ← hexChar
-    Char.ofNat $ 4096*u1 + 256*u2 + 16*u3 + u4
+    return Char.ofNat $ 4096*u1 + 256*u2 + 16*u3 + u4
   | _ => fail "illegal \\u escape"
 
 def stringLitteral : Parsec String := do
@@ -49,7 +49,7 @@ def stringLitteral : Parsec String := do
       escapedChar
     -- Permitted range
     else if 0x0020 ≤ c.val ∧ c.val ≤ 0x10ffff then
-      c
+      pure c
     else
       fail "unexpected character in string"
   let s ← manyChars internals

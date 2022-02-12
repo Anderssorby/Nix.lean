@@ -24,17 +24,17 @@ def hexChar : Parsec Nat := do
 def escapedChar : Parsec Char := do
   let c ← anyChar
   match c with
-  | '\\' => '\\'
-  | '"'  => '"'
-  | '/'  => '/'
-  | 'b'  => '\x08'
-  | 'f'  => '\x0c'
-  | 'n'  => '\n'
-  | 'r'  => '\x0d'
-  | 't'  => '\t'
+  | '\\' => pure '\\'
+  | '"'  => pure '"'
+  | '/'  => pure '/'
+  | 'b'  => pure '\x08'
+  | 'f'  => pure '\x0c'
+  | 'n'  => pure '\n'
+  | 'r'  => pure '\x0d'
+  | 't'  => pure '\t'
   | 'u'  =>
     let u1 ← hexChar; let u2 ← hexChar; let u3 ← hexChar; let u4 ← hexChar
-    Char.ofNat $ 4096*u1 + 256*u2 + 16*u3 + u4
+    return Char.ofNat $ 4096*u1 + 256*u2 + 16*u3 + u4
   | _ => fail "illegal \\u escape"
 
 partial def stringLitteral : Parsec String := do
@@ -57,13 +57,13 @@ partial def stringLitteral : Parsec String := do
 
 @[inline]
 def digitNonZero : Parsec Nat := do
-  let c ← satisfy (fun c => '1' ≤ c ∧ c ≤ '9') -- "1-9"
-  c.val.toNat - '0'.val.toNat
+  let c ← satisfy (fun c => '1' ≤ c ∧ c ≤ '9')
+  return c.val.toNat - '0'.val.toNat
 
 @[inline]
 def digitNat : Parsec Nat := do
   let c ← satisfy (fun c => '0' ≤ c ∧ c ≤ '9')
-  c.val.toNat - '0'.val.toNat
+  return c.val.toNat - '0'.val.toNat
 
 def digitsToNat (ds : Array Nat) : Nat :=
   ds.toList.enum.foldl (λ acc (d, i) => acc + d * 10 ^ i) 0
@@ -79,29 +79,29 @@ def num : Parsec Number := do
     let digits ← many1 digitNat
     let exponent := digits.size
     let mantissa := whole * (10 ^ exponent : Nat) + sign * digitsToNat digits
-    { mantissa, exponent : Number }
+    return { mantissa, exponent : Number }
   let numb : Number :=  optDecimals.getD <| Number.fromInt whole
   let withExp : Parsec Number := do
     skipChar 'e' <|> skipChar 'E'
     let sign ← pchar '-' <|> pchar '+'
     let n ← digitsToNat <$> many1 digitNat
     if sign = '-' then 
-      numb.shiftr n
+      return numb.shiftr n
     else
-      numb.shiftl n
+      return numb.shiftl n
 
   withExp <|> pure numb
 
 def reservedWords := #[ "let", "with", "in", "if", "then", "else", "inherit", "rec" ]
 
 @[inline]
-def name : Parsec String := do
-  let starters := List.foldl (λ p c => p <|> pchar c) asciiLetter ['_', '$']
+def name : Parsec Name := do
+  let starters := List.foldl (λ p c => p <|> pchar c) asciiLetter ['_', '$', '-']
   let c ← starters
   let rest ← manyChars (starters <|> digit)
   let n := s!"{c}{rest}"
   if Array.all reservedWords (λ s => s != n) then
-    n
+    return n
   else
     fail "reserved"
 
@@ -112,34 +112,34 @@ def litteral : Parsec Expr := do
   let number := do
       let n ← num
       ws
-      Expr.num n
+      return Expr.num n
   string <|> number
 
 def operator : Parsec Operator := do
   let dot := do
     skipChar '.'
-    Operator.dot
+    return Operator.dot
   let merge := do
     skipString "//"
-    Operator.merge
+    return Operator.merge
   let or := do
     skipString "||"
-    Operator.or_
+    return Operator.or_
   let and := do
     skipString "&&"
-    Operator.and_
+    return Operator.and_
   let append := do
     skipString "++"
-    Operator.append
+    return Operator.append
   let add := do
     skipChar '+'
-    Operator.add
+    return Operator.add
   let minus := do
     skipChar '-'
-    Operator.minus
+    return Operator.minus
   let mul := do
     skipChar '*'
-    Operator.mul
+    return Operator.mul
   dot <|> merge <|> or <|> and <|> append <|> add <|> minus <|> mul
 
 mutual
@@ -149,7 +149,7 @@ partial def stringInterpolation : Parsec Expr := do
   skipChar '{'
   let e ← expression
   skipChar '}'
-  e
+  return e
 
 partial def attrSetKey : Parsec AttrSetKey := do
   let part := (Expr.fvar <$> name) <|> (Expr.str <$> stringLitteral) <|> stringInterpolation
@@ -158,36 +158,40 @@ partial def attrSetKey : Parsec AttrSetKey := do
     skipChar '.'
     part
   if rest.isEmpty then
-    AttrSetKey.name first
+    return AttrSetKey.name first
   else
-    AttrSetKey.expr (first :: rest.toList).toArray
+    return AttrSetKey.expr (first :: rest.toList).toArray
 
 partial def list : Parsec Expr := do
   skipChar '['
   let l ← many expression
+  ws
   skipChar ']'
-  Expr.list l
+  return Expr.list l
 
 partial def attrset : Parsec Expr := do
   let isRec ← test <| skipString "rec"
   ws
   skipChar '{'
   let rec internal : Parsec (List (AttrSetKey × Expr)) := do
+    let com ← option <| manyStrings comment
     ws
     if (← test <| skipChar '}') then
-      []
+      return []
     else
       let k ← attrSetKey
       ws
       skipString "="
       ws
+      let start ← getPos
       let v ← expression
+      let stop ← getPos
       ws
       skipString ";"
       ws
       let kvs ← internal
-      kvs.append [(k, v)]
-  Expr.attrset isRec (← internal)
+      return kvs.append [(k, Expr.meta {start, stop} com v)]
+  return Expr.attrset isRec (← internal)
 
 partial def ifStatement : Parsec Expr := do
   skipString "if"
@@ -198,7 +202,7 @@ partial def ifStatement : Parsec Expr := do
   let t ← expression
   skipString "else"
   let f ← expression
-  Expr.ifStatement e t f
+  return Expr.ifStatement e t f
 
 partial def withStatement : Parsec Expr := do
   skipString "with"
@@ -208,7 +212,7 @@ partial def withStatement : Parsec Expr := do
   skipChar ';'
   ws
   let e ← expression
-  Expr.withStatement w e
+  return Expr.withStatement w e
 
 /-
 Parse a let statement
@@ -227,9 +231,9 @@ partial def letStatement : Parsec Expr := do
     let ex ← expression
     ws
     skipChar ';'
-    let end_ ← getPos
+    let stop ← getPos
     ws
-    (n, Expr.meta {start, end_} com ex)
+    return (n, Expr.meta {start, stop} com ex)
   skipString "let"
   ws
   let ass ← many1 assignment
@@ -237,7 +241,7 @@ partial def letStatement : Parsec Expr := do
   skipString "in"
   ws
   let ex ← expression
-  Expr.letExpr ass ex
+  return Expr.letExpr ass ex
 
 partial def lambda : Parsec Expr := do
   let rec varsp : Parsec <| List (Name × Option Expr) × Bool := do
@@ -262,19 +266,19 @@ partial def lambda : Parsec Expr := do
       ws
       skipChar '@'
       ws
-      n
+      return n
     skipChar '{'
     ws
     let (vars, catchAll) ← varsp
     ws
     skipChar '}'
-    LBinding.destructure optName vars.toArray catchAll
+    return LBinding.destructure optName vars.toArray catchAll
   let binding ← (LBinding.var <$> name) <|> destruct
   ws
   skipChar ':'
   ws
   let e ← expression
-  Expr.lam binding e
+  return Expr.lam binding e
 
 partial def comment : Parsec String := do
   ws
@@ -288,7 +292,7 @@ partial def app : Parsec Expr := do
   let e1 ← recSafeExpression
   ws
   let e2 ← expression
-  Expr.app e1 e2
+  return Expr.app e1 e2
 
 /-
 Binary operation e1 `op` e2
@@ -300,14 +304,14 @@ partial def operation : Parsec Expr := do
   let op ← operator
   ws
   let e2 ← expression
-  Expr.opr e1 op e2
+  return Expr.opr e1 op e2
 
 partial def recSafeExpression : Parsec Expr := do
   let wrappedExpression : Parsec Expr := do
     skipChar '('
     let e ← expression
     skipChar ')'
-    e
+    return e
   litteral
     <|> lambda
     <|> list
@@ -320,9 +324,12 @@ partial def recSafeExpression : Parsec Expr := do
 partial def expression : Parsec Expr := do
   let com ← option <| manyStrings comment
   ws
-  recSafeExpression
+  let start ← getPos
+  let expr ← recSafeExpression
     <|> operation
     <|> app
+  let stop ← getPos
+  return Expr.meta {start, stop} com expr
 
 end
 
@@ -331,7 +338,7 @@ def file : Parsec Expr := do
   let res ← expression
   ws
   eof
-  res
+  return res
 
 end Parser
 

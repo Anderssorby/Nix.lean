@@ -25,8 +25,8 @@ namespace System
 
 def FilePath.findAllWithExt (p : FilePath) (ext : String) : IO (Array FilePath) := do
   if (← p.isDir) then
-    (← p.walkDir).filter (·.extension == some ext)
+    return (← p.walkDir).filter (·.extension == some ext)
   else
-    #[]
+    return #[]
 
 end System
