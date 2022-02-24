@@ -12,8 +12,12 @@ open Nix.Expression.Parser
 #eval lambda.parse "{a ? 1}: a"
 #eval lambda.parse "{a ? 1, b, ...}: a"
 
+#eval stringInterpolation.parse "${test}"
 #eval expression.parse "left.right {a}: a.b"
-
+#eval expression.parse "a.${b} c"
+#eval expression.parse "flake.utils b c (d) (a: a + b)"
+#eval file.parse "flake-utils.lib.eachSystem supportedSystems (system: system)"
+ 
 def main (args : List String) : IO UInt32 := do
   try
     let files ← (FilePath.mk "test/nix").findAllWithExt "nix"
@@ -27,4 +31,3 @@ def main (args : List String) : IO UInt32 := do
   catch e =>
     IO.eprintln <| "error: " ++ toString e
     pure 1
-

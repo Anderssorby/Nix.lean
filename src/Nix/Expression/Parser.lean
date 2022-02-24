@@ -165,13 +165,13 @@ partial def attrSetKey : Parsec AttrSetKey := do
 partial def list : Parsec Expr := do
   skipChar '['
   let l ← many expression
-  ws
+  wsc
   skipChar ']'
   return Expr.list l
 
 partial def attrset : Parsec Expr := do
   let isRec ← test <| skipString "rec"
-  ws
+  wsc
   skipChar '{'
   let rec internal : Parsec (List (AttrSetKey × Expr)) := do
     let com ← option <| manyStrings comment
@@ -180,13 +180,13 @@ partial def attrset : Parsec Expr := do
       return []
     else
       let k ← attrSetKey
-      ws
+      wsc
       skipString "="
-      ws
+      wsc
       let start ← getPos
       let v ← expression
       let stop ← getPos
-      ws
+      wsc
       skipString ";"
       ws
       let kvs ← internal
@@ -197,7 +197,7 @@ partial def ifStatement : Parsec Expr := do
   skipString "if"
   ws
   let e ← expression
-  ws
+  wsc
   skipString "then"
   let t ← expression
   skipString "else"
@@ -206,9 +206,9 @@ partial def ifStatement : Parsec Expr := do
 
 partial def withStatement : Parsec Expr := do
   skipString "with"
-  ws
+  wsc
   let w ← fvar
-  ws
+  wsc
   skipChar ';'
   ws
   let e ← expression
@@ -237,7 +237,7 @@ partial def letStatement : Parsec Expr := do
   skipString "let"
   ws
   let ass ← many1 assignment
-  ws
+  wsc
   skipString "in"
   ws
   let ex ← expression
@@ -245,14 +245,14 @@ partial def letStatement : Parsec Expr := do
 
 partial def lambda : Parsec Expr := do
   let rec varsp : Parsec <| List (Name × Option Expr) × Bool := do
-    ws
+    wsc
     if ← test <| skipString "..." then
       return ([], true)
     let n ← name
-    ws
+    wsc
     let optDef ← option <| do
       skipChar '?'
-      ws
+      wsc
       expression
     ws
     if ← test <| skipChar ',' then
@@ -263,9 +263,9 @@ partial def lambda : Parsec Expr := do
   let destruct : Parsec LBinding := do
     let optName : Option Name ← option <| do
       let n ← name
-      ws
+      wsc
       skipChar '@'
-      ws
+      wsc
       return n
     skipChar '{'
     ws
@@ -274,7 +274,7 @@ partial def lambda : Parsec Expr := do
     skipChar '}'
     return LBinding.destructure optName vars.toArray catchAll
   let binding ← (LBinding.var <$> name) <|> destruct
-  ws
+  wsc
   skipChar ':'
   ws
   let e ← expression
@@ -283,14 +283,22 @@ partial def lambda : Parsec Expr := do
 partial def comment : Parsec String := do
   ws
   skipChar '#'
-  manyChars <| satisfy (λ c => c != '\n')
+  let com ← manyChars <| satisfy (λ c => c != '\n')
+  ws
+  return com
+
+partial def comments : Parsec (Option String) := option <| do
+  manyStrings comment
+
+partial def wsc : Parsec Unit := comments >>= fun _ => pure ()
 
 /-
 Function application e1 e2
 -/
 partial def app : Parsec Expr := do
   let e1 ← recSafeExpression
-  ws
+  wsc
+  let com ← comments
   let e2 ← expression
   return Expr.app e1 e2
 
@@ -298,11 +306,13 @@ partial def app : Parsec Expr := do
 Binary operation e1 `op` e2
 -/
 partial def operation : Parsec Expr := do
-  ws
+  wsc
   let e1 ← recSafeExpression
-  ws
+  wsc
+  let com ← comments
+  wsc
   let op ← operator
-  ws
+  wsc
   let e2 ← expression
   return Expr.opr e1 op e2
 
@@ -319,15 +329,17 @@ partial def recSafeExpression : Parsec Expr := do
     <|> ifStatement
     <|> letStatement
     <|> fvar
+    <|> stringInterpolation
     <|> wrappedExpression
 
 partial def expression : Parsec Expr := do
-  let com ← option <| manyStrings comment
+  let com ← comments
   ws
   let start ← getPos
-  let expr ← recSafeExpression
-    <|> operation
+  let expr ←
+    operation
     <|> app
+    <|> recSafeExpression
   let stop ← getPos
   return Expr.meta {start, stop} com expr
 
@@ -336,7 +348,7 @@ end
 def file : Parsec Expr := do
   ws
   let res ← expression
-  ws
+  wsc
   eof
   return res
 

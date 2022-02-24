@@ -21,6 +21,15 @@ instance {V : Type} [BEq V] [Hashable V] : BEq <| HashSet V where
 
 end Std
 
+namespace String
+
+def repeat (s : String) (n : Nat) : String :=
+  match n with
+  | 0 => s
+  | Nat.succ ns => s ++ repeat s ns
+
+end String
+
 namespace System
 
 def FilePath.findAllWithExt (p : FilePath) (ext : String) : IO (Array FilePath) := do

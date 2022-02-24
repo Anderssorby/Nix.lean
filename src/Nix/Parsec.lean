@@ -1,3 +1,4 @@
+import Nix.Utils
 
 namespace Parsec
 
@@ -73,10 +74,19 @@ and the second is tried if the first one fails.
 -/
 @[inline]
 def orElse (p : Parsec α) (q : Unit → Parsec α) : Parsec α := fun pos =>
+  let qres := q () pos
   match p pos with
-  | success rem a => success rem a
+  | success rem a =>
+    match qres with
+    | error rem2 err2 => success rem a
+    | success rem2 a2 =>
+      -- Forward the longest match
+      if rem.it.i >= rem2.it.i then
+        success rem a
+      else
+        success rem2 a2
   | error rem err => 
-    match q () pos with
+    match qres with
     | error rem2 err2 =>
       -- Forward the error of the longest match
       if rem.it.i = rem2.it.i then
@@ -86,7 +96,6 @@ def orElse (p : Parsec α) (q : Unit → Parsec α) : Parsec α := fun pos =>
       else
         error rem2 err2
     | success rem a => success rem a
-
 
 def isNewline (c : Char) : Bool :=
   c = '\n'
@@ -292,7 +301,10 @@ def wsStrict : Parsec Unit := do
 
 def parse {A: Type} (p: Parsec A) (s : String) : Except String A :=
   match p { it := s.mkIterator : Parsec.Pos } with
-  | Parsec.ParseResult.success _ res => Except.ok res
-  | Parsec.ParseResult.error pos err  => Except.error s!"{err} ({pos.line}:{pos.lineOffset})"
+  | ParseResult.success _ res => Except.ok res
+  | ParseResult.error pos err  =>
+  let line := (s.split (λ c => c = '\n')).getD (pos.line-1) ""
+  let pointer := "-".repeat (pos.lineOffset-1) ++ "^"
+  Except.error s!"\n{line}\n{pointer}\n{err} ({pos.line}:{pos.lineOffset})"
 
 end Parsec
