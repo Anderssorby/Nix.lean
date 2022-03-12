@@ -1,4 +1,4 @@
-import Nix.Parsec
+import Parsec
 import Nix.Expression.Types
 
 open Std (RBNode RBNode.singleton RBNode.leaf)
@@ -66,7 +66,7 @@ def digitNat : Parsec Nat := do
   return c.val.toNat - '0'.val.toNat
 
 def digitsToNat (ds : Array Nat) : Nat :=
-  ds.toList.enum.foldl (λ acc (d, i) => acc + d * 10 ^ i) 0
+  ds.toList.enum.foldl (λ acc (d, i) => acc + d * 10 ^ (i+1)) 0
 
 def num : Parsec Number := do
   let sign : Int ←
@@ -290,7 +290,7 @@ partial def comment : Parsec String := do
 partial def comments : Parsec (Option String) := option <| do
   manyStrings comment
 
-partial def wsc : Parsec Unit := comments >>= fun _ => pure ()
+partial def wsc : Parsec Unit := comments >>= (fun _ => pure ())
 
 /-
 Function application e1 e2

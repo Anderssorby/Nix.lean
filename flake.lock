@@ -31,6 +31,21 @@
         "type": "github"
       }
     },
+    "flake-utils_10": {
+      "locked": {
+        "lastModified": 1644229661,
+        "narHash": "sha256-1YdnJAsNy69bpcjuoKdOYQX0YxZBiCYZo4Twxerqv7k=",
+        "owner": "numtide",
+        "repo": "flake-utils",
+        "rev": "3cecb5b042f7f209c56ffd8371b2711a290ec797",
+        "type": "github"
+      },
+      "original": {
+        "owner": "numtide",
+        "repo": "flake-utils",
+        "type": "github"
+      }
+    },
     "flake-utils_2": {
       "locked": {
         "lastModified": 1638122382,
@@ -806,12 +821,37 @@
         "type": "github"
       }
     },
+    "parsec": {
+      "inputs": {
+        "flake-utils": "flake-utils_10",
+        "lean": [
+          "lean"
+        ],
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1647013238,
+        "narHash": "sha256-TICydR58ihL1HGvFkggOqNBtnUNF3j+NbbuLNjqRZLs=",
+        "owner": "yatima-inc",
+        "repo": "Parsec.lean",
+        "rev": "3ffe965dc4b14f7e63055fed1417945636c54fca",
+        "type": "github"
+      },
+      "original": {
+        "owner": "yatima-inc",
+        "repo": "Parsec.lean",
+        "type": "github"
+      }
+    },
     "root": {
       "inputs": {
         "flake-utils": "flake-utils",
         "lean": "lean",
         "lean-ipld": "lean-ipld",
-        "nixpkgs": "nixpkgs_14"
+        "nixpkgs": "nixpkgs_14",
+        "parsec": "parsec"
       }
     },
     "temci": {
