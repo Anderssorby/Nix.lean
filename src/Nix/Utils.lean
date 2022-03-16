@@ -19,9 +19,17 @@ instance {V : Type} [BEq V] [Hashable V] : Hashable <| HashSet V where
 instance {V : Type} [BEq V] [Hashable V] : BEq <| HashSet V where
   beq a b := a.toList ==  b.toList
 
+instance {K V : Type} [BEq K] [BEq V] [Hashable K] : BEq <| HashMap K V where
+  beq a b := a.toList ==  b.toList
+
 end Std
 
 namespace String
+
+-- TODO
+def sanitize (s : String) : String := s.replace "\"" "\\\""
+
+def asStringLitteral (s : String) : String := s!"\"{s.sanitize}\""
 
 def repeat (s : String) (n : Nat) : String :=
   match n with
