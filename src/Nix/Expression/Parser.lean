@@ -10,6 +10,11 @@ namespace Parser
 open Parsec
 
 @[inline]
+def getPos : Parsec Position := do
+  let s ← get
+  return { line := s.line, lineOffset := s.lineOffset }
+
+@[inline]
 def hexChar : Parsec Nat := do
   let c ← anyChar
   if '0' ≤ c ∧ c ≤ '9' then
@@ -105,10 +110,10 @@ def name : Parsec Name := do
   else
     fail "reserved"
 
-def fvar : Parsec Expr := map Expr.fvar name
+def fvar : Parsec Expr := ParsecM.map Expr.fvar name
 
 def litteral : Parsec Expr := do
-  let string := map Expr.str stringLitteral
+  let string := ParsecM.map Expr.str stringLitteral
   let number := do
       let n ← num
       ws

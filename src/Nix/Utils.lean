@@ -31,10 +31,10 @@ def sanitize (s : String) : String := s.replace "\"" "\\\""
 
 def asStringLitteral (s : String) : String := s!"\"{s.sanitize}\""
 
-def repeat (s : String) (n : Nat) : String :=
+def replicate (s : String) (n : Nat) : String :=
   match n with
   | 0 => s
-  | Nat.succ ns => s ++ repeat s ns
+  | Nat.succ ns => s ++ replicate s ns
 
 end String
 

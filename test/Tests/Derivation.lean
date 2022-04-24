@@ -7,7 +7,9 @@ namespace Tests.Derivation
 
 #print "Testing Derivation.Parser"
 
-#eval (listOf stringLitteral).parse "[\"a\"]"
+def ls := (listOf stringLitteral).parse "[\"a\",\"b\"]"
+
+#eval ls.map λ l => l == #["a", "b"]
 #eval derivation.parse "Derive([(\"out\", \"\", \"\", \"\")], [(\"input\", [\"\"])],[\"srcs\"], \"x86_64-linux\", \"builder\", [\"args\"],[(\"ENV\",\"val\")])"
 
 def drv_base : Derivation :=
