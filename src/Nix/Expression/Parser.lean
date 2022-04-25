@@ -71,7 +71,7 @@ def digitNat : Parsec Nat := do
   return c.val.toNat - '0'.val.toNat
 
 def digitsToNat (ds : Array Nat) : Nat :=
-  ds.toList.enum.foldl (λ acc (d, i) => acc + d * 10 ^ (i+1)) 0
+  ds.toList.reverse.enum.foldl (λ acc (i, d) => acc + d * 10 ^ i) 0
 
 def num : Parsec Number := do
   let sign : Int ←
@@ -258,7 +258,8 @@ partial def lambda : Parsec Expr := do
     let optDef ← option <| do
       skipChar '?'
       wsc
-      expression
+      Expr.num <$> num
+      -- expression
     ws
     if ← test <| skipChar ',' then
       let (l, ca) ← varsp

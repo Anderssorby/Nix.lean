@@ -6,13 +6,20 @@ open Nix Nix.Expression Nix.Expression.Parser System
 namespace Tests.Expression
 
 #print "Testing Expression.Parser"
+
+#eval (num.parse "123").map λ {mantissa, ..} => (mantissa, mantissa == 123)
+
 #eval letStatement.parse "let\n a = \"\";\n in a"
-#eval num.parse "1"
+#eval letStatement.parse "let\n a=2; b = \"\";\n in a"
 
 #eval comments.parse " #Test\n #test2  t"
-#eval expression.parse " #Test\n #test2  t\ni+#a\n2 * a" 
+#eval expression.parse " #Test\n #test2  t\ni+#a\n2 * a"
 
 #eval lambda.parse "arg: expr"
+#eval lambda.parse "{a}: a"
+#eval lambda.parse "{a, b}: a"
+#eval lambda.parse "{a, b, c}: a"
+#eval lambda.parse "{a ? \"test\"}: a"
 #eval lambda.parse "{a ? 1}: a"
 #eval lambda.parse "{a ? 1, b, ...}: a"
 
