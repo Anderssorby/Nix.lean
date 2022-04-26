@@ -42,23 +42,23 @@ def escapedChar : Parsec Char := do
     return Char.ofNat $ 4096*u1 + 256*u2 + 16*u3 + u4
   | _ => fail "illegal \\u escape"
 
-partial def stringLitteral : Parsec String := do
-  skipChar '"'
-  let rec internal : String → Parsec String := λ acc => do 
-    let c ← anyChar
-    if c = '"' then
-      return acc
+partial def stringLitteralInternal : Parsec String := do
+  if ← test <| pchar '"' then
+    return ""
+  else if ← test <| pchar '\\' then
+      let ec ← escapedChar
+      (·.push ec) <$> stringLitteralInternal
+    -- as to whether c.val > 0xffff should be split up and encoded with multiple \u,
+    -- the JSON standard is not definite: both directly printing the character
+    -- and encoding it with multiple \u is allowed. we choose the former.
+    else if let some c ← option <| satisfy (λ c => 0x0020 ≤ c.val ∧ c.val ≤ 0x10ffff) then
+      (·.push c) <$> stringLitteralInternal
     else
-      if c = '\\' then
-        internal <| acc.push (← escapedChar)
-      -- as to whether c.val > 0xffff should be split up and encoded with multiple \u,
-      -- the JSON standard is not definite: both directly printing the character
-      -- and encoding it with multiple \u is allowed. we choose the former.
-      else if 0x0020 ≤ c.val ∧ c.val ≤ 0x10ffff then
-        internal <| acc.push c
-      else
-        fail "unexpected character in string"
-  internal ""
+      fail "unexpected character in string"
+
+def stringLitteral : Parsec String := do
+  skipChar '"'
+  stringLitteralInternal
 
 @[inline]
 def digitNonZero : Parsec Nat := do
@@ -149,6 +149,8 @@ def operator : Parsec Operator := do
 
 mutual
 
+-- TODO prove termination and remove partial
+
 partial def stringInterpolation : Parsec Expr := do
   skipChar '$'
   skipChar '{'
@@ -174,29 +176,30 @@ partial def list : Parsec Expr := do
   skipChar ']'
   return Expr.list l
 
+partial def attrsetInternal : Parsec (List (AttrSetKey × Expr)) := do
+  let com ← option <| manyStrings comment
+  ws
+  if (← test <| skipChar '}') then
+    return []
+  else
+    let k ← attrSetKey
+    wsc
+    skipString "="
+    wsc
+    let start ← getPos
+    let v ← expression
+    let stop ← getPos
+    wsc
+    skipString ";"
+    ws
+    let kvs ← attrsetInternal
+    return kvs.append [(k, Expr.meta {start, stop} com v)]
+
 partial def attrset : Parsec Expr := do
   let isRec ← test <| skipString "rec"
   wsc
   skipChar '{'
-  let rec internal : Parsec (List (AttrSetKey × Expr)) := do
-    let com ← option <| manyStrings comment
-    ws
-    if (← test <| skipChar '}') then
-      return []
-    else
-      let k ← attrSetKey
-      wsc
-      skipString "="
-      wsc
-      let start ← getPos
-      let v ← expression
-      let stop ← getPos
-      wsc
-      skipString ";"
-      ws
-      let kvs ← internal
-      return kvs.append [(k, Expr.meta {start, stop} com v)]
-  return Expr.attrset isRec (← internal)
+  return Expr.attrset isRec (← attrsetInternal)
 
 partial def ifStatement : Parsec Expr := do
   skipString "if"
@@ -248,24 +251,27 @@ partial def letStatement : Parsec Expr := do
   let ex ← expression
   return Expr.letExpr ass ex
 
-partial def lambda : Parsec Expr := do
-  let rec varsp : Parsec <| List (Name × Option Expr) × Bool := do
-    wsc
-    if ← test <| skipString "..." then
-      return ([], true)
-    let n ← name
-    wsc
-    let optDef ← option <| do
-      skipChar '?'
-      wsc
-      Expr.num <$> num
-      -- expression
+partial def varsp : Parsec <| List (Name × Option Expr) × Bool := do
+  wsc
+  if ← test <| skipString "..." then
+    return ([], true)
+  let n ← name
+  wsc
+  let optDef ← option <| do {
+    ws;
+    skipChar '?';
+    wsc;
+    expression
+  }
+  ws;
+  if ← test <| skipChar ',' then
     ws
-    if ← test <| skipChar ',' then
-      let (l, ca) ← varsp
-      return ((n, optDef) :: l, ca)
-    else
-      return ([(n, optDef)], false)
+    let (l, ca) ← varsp
+    return ((n, optDef) :: l, ca);
+  else
+    return ([(n, optDef)], false);
+
+partial def lambda : Parsec Expr := do
   let destruct : Parsec LBinding := do
     let optName : Option Name ← option <| do
       let n ← name

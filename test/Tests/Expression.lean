@@ -1,7 +1,7 @@
 import Nix
 import Nix.Utils
 
-open Nix Nix.Expression Nix.Expression.Parser System
+open Nix Nix.Expression Nix.Expression.Parser System Parsec
 
 namespace Tests.Expression
 
