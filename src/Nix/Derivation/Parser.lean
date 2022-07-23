@@ -1,7 +1,7 @@
 import Std
 import Nix.Utils
 import Nix.Derivation.Types
-import Nix.Parsec
+import Parsec
 
 open Parsec
 open Std
@@ -117,7 +117,7 @@ def derivation : Parsec Derivation := do
     let value ← stringLitteral
     skipChar ')'
     return (name, value)
-  skipString "Derive"
+  ws; skipString "Derive"
   ws; skipChar '('; ws
   let outputs ← HashMap.fromArray <$> listOf outputP
   ws; skipChar ','; ws

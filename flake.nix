@@ -16,13 +16,18 @@
       inputs.lean.follows = "lean";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    parsec = {
+      url = "github:yatima-inc/Parsec.lean";
+      inputs.lean.follows = "lean";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = { self, lean, flake-utils, nixpkgs, lean-ipld }:
+  outputs = { self, lean, flake-utils, nixpkgs, lean-ipld, parsec }:
     let
       supportedSystems = [
-        # "aarch64-linux"
-        # "aarch64-darwin"
+        "aarch64-linux"
+        "aarch64-darwin"
         "i686-linux"
         "x86_64-darwin"
         "x86_64-linux"
@@ -35,7 +40,7 @@
         name = "Nix";  # must match the name of the top-level .lean file
         project = leanPkgs.buildLeanPackage {
           inherit name;
-          # deps = with leanPkgs; [ Init Lean ];#lean-ipld.project.${system} ];
+          deps = [ parsec.project.${system} ];
           # Where the lean files are located
           src = ./src;
         };
@@ -43,6 +48,7 @@
           name = "Nix.Cli";
           deps = [ project ];
           src = ./src;
+          executableName = "nix";
         };
         test = leanPkgs.buildLeanPackage {
           name = "Tests";

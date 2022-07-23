@@ -166,9 +166,14 @@ instance : ToString Operator := ⟨λ op : Operator =>
   ⟩
 
 structure Position where
-  start : (Nat × Nat)
-  stop : (Nat × Nat)
-  deriving BEq
+  line : Nat
+  lineOffset : Nat
+  deriving BEq, Repr, Inhabited
+
+structure TextRange where
+  start : Position
+  stop : Position
+  deriving BEq, Repr, Inhabited
 
 mutual
 
@@ -201,7 +206,7 @@ inductive Expr where
   -- Constants
   | num (n : Number)
   -- Meta info
-  | meta (pos : Position) (docs : Option String) (e : Expr)
+  | meta (rangePos : TextRange) (docs : Option String) (e : Expr)
   deriving BEq
 
 end
