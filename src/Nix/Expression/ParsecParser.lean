@@ -1,4 +1,4 @@
-import Megaparsec
+import Parsec
 import Nix.Expression.Types
 
 open Std (RBNode RBNode.singleton RBNode.leaf)
