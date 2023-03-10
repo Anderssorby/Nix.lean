@@ -1,5 +1,5 @@
-import Std
-open Std
+import Std.Data.HashMap
+import Lean.Data.HashSet
 open System
 open Lean
 
@@ -12,7 +12,7 @@ def HashMap.fromArray {K V : Type} [BEq K] [BEq V] [Hashable K] [Hashable V]
   arr.foldl (λ map (k, v) => map.insert k v) <| mkHashMap (capacity := arr.size)
 
 def HashSet.fromArray {V : Type} [BEq V] [Hashable V] (arr : Array V) : HashSet V :=
-  arr.foldl (λ set v => set.insert v) <| HashSet.mkHashSet (nbuckets := arr.size)
+  arr.foldl (λ set v => set.insert v) <| mkHashSet (capacity := arr.size)
 
 instance {V : Type} [BEq V] [Hashable V] : Hashable <| HashSet V where
   hash sv := hash sv.toList

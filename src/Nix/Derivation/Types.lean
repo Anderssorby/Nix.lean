@@ -1,7 +1,7 @@
-import Std
+import Std.Data.HashMap
 import Nix.Utils
 namespace Nix
-open Std
+open Lean
 
 structure StorePath where
   -- The hash is sufficient
@@ -34,7 +34,6 @@ structure Derivation where
     env       : HashMap String String
     -- ^ Environment variables provided to the executable used to build the
     -- derivation
-    deriving BEq
 
 namespace Derivation
 

@@ -77,12 +77,21 @@
         checks.test = test.executable;
 
         defaultPackage = self.packages.${system}.cli;
-        devShell = pkgs.mkShell {
-          buildInputs = with pkgs; [
-            leanPkgs.lean-dev
-          ];
-          LEAN_PATH = "./src:./test";
-          LEAN_SRC_PATH = "./src:./test";
+        devShells = {
+          default = pkgs.mkShell {
+            buildInputs = with pkgs; [
+              elan
+            ];
+            LEAN_PATH = "./src:./test";
+            LEAN_SRC_PATH = "./src:./test";
+          };
+          lean-dev = pkgs.mkShell {
+            buildInputs = with pkgs; [
+              leanPkgs.lean-dev
+            ];
+            LEAN_PATH = "./src:./test";
+            LEAN_SRC_PATH = "./src:./test";
+          };
         };
       });
 }

@@ -1,6 +1,6 @@
 import Nix
 import Nix.Utils
-import Std
+import Std.Data.HashMap
 
 open Nix Nix.Derivation Parser System
 namespace Tests.Derivation

@@ -1,4 +1,4 @@
-import Std
+import Std.Data.HashMap
 import Nix.Utils
 import Nix.Derivation.Types
 import Parsec
