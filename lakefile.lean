@@ -12,6 +12,9 @@ lean_lib Nix {
 -- require LSpec from git
 --   "https://github.com/yatima-inc/LSpec" @ "main"
 
+require Cli from git
+  "https://github.com/yatima-inc/Cli.lean" @ "main"
+
 require std from git
   "https://github.com/leanprover/std4.git" @ "main"
 
@@ -27,4 +30,4 @@ lean_exe nix {
   root := `Nix.Cli
 }
 
--- lean_exe Tests.Parsec
+lean_exe test.Tests

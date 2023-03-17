@@ -20,11 +20,17 @@
     "name": "Straume",
     "inputRev?": "9597873f0b18a9e97b7315fb84968c55d09a6112"}},
   {"git":
-   {"url": "https://github.com/yatima-inc/LSpec",
+   {"url": "https://github.com/yatima-inc/lspec/",
     "subDir?": null,
     "rev": "88f7d23e56a061d32c7173cea5befa4b2c248b41",
     "name": "LSpec",
     "inputRev?": "88f7d23e56a061d32c7173cea5befa4b2c248b41"}},
+  {"git":
+   {"url": "https://github.com/yatima-inc/Cli.lean",
+    "subDir?": null,
+    "rev": "ef6f9bcd1738638fca8d319dbee653540d56614e",
+    "name": "Cli",
+    "inputRev?": "main"}},
   {"git":
    {"url": "https://github.com/leanprover/std4.git",
     "subDir?": null,
