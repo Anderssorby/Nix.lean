@@ -3,26 +3,36 @@
 
   inputs = {
     lean = {
+      # url = "github:leanprover/lean4/v4.0.0-m5";
       url = "github:leanprover/lean4";
     };
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-21.05";
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
     flake-utils = {
       url = "github:numtide/flake-utils";
-      inputs.nixpkgs.follows = "nixpkgs";
     };
     # A lean dependency
-    lean-ipld = {
-      url = "github:yatima-inc/lean-ipld";
+    # lean-ipld = {
+    #   url = "github:yatima-inc/lean-ipld";
+    #   inputs.lean.follows = "lean";
+    #   inputs.nixpkgs.follows = "nixpkgs";
+    # };
+    megaparsec = {
+      url = "github:anderssorby/Megaparsec.lean";
+      inputs.lean.follows = "lean";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+    parsec = {
+      url = "github:yatima-inc/Parsec.lean";
       inputs.lean.follows = "lean";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
 
-  outputs = { self, lean, flake-utils, nixpkgs, lean-ipld }:
+  outputs = { self, lean, flake-utils, nixpkgs, parsec, megaparsec }@inputs:
     let
       supportedSystems = [
-        # "aarch64-linux"
-        # "aarch64-darwin"
+        "aarch64-linux"
+        "aarch64-darwin"
         "i686-linux"
         "x86_64-darwin"
         "x86_64-linux"
@@ -35,7 +45,7 @@
         name = "Nix";  # must match the name of the top-level .lean file
         project = leanPkgs.buildLeanPackage {
           inherit name;
-          # deps = with leanPkgs; [ Init Lean ];#lean-ipld.project.${system} ];
+          deps = [ parsec.project.${system} megaparsec.project.${system} ];
           # Where the lean files are located
           src = ./src;
         };
@@ -43,6 +53,7 @@
           name = "Nix.Cli";
           deps = [ project ];
           src = ./src;
+          executableName = "nix";
         };
         test = leanPkgs.buildLeanPackage {
           name = "Tests";
@@ -55,7 +66,7 @@
       in
       {
         inherit project test;
-        packages = {
+        packages = project // {
           ${name} = project.sharedLib;
           inherit (project) lean-package print-paths;
           inherit (leanPkgs) lean;
@@ -66,12 +77,21 @@
         checks.test = test.executable;
 
         defaultPackage = self.packages.${system}.cli;
-        devShell = pkgs.mkShell {
-          buildInputs = with pkgs; [
-            leanPkgs.lean-dev
-          ];
-          LEAN_PATH = "./src:./test";
-          LEAN_SRC_PATH = "./src:./test";
+        devShells = {
+          default = pkgs.mkShell {
+            buildInputs = with pkgs; [
+              elan
+            ];
+            LEAN_PATH = "./src:./test";
+            LEAN_SRC_PATH = "./src:./test";
+          };
+          lean-dev = pkgs.mkShell {
+            buildInputs = with pkgs; [
+              leanPkgs.lean-dev
+            ];
+            LEAN_PATH = "./src:./test";
+            LEAN_SRC_PATH = "./src:./test";
+          };
         };
       });
 }

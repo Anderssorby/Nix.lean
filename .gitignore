@@ -1,2 +1,5 @@
 *.olean
 result*
+lean_packages
+build
+lake-packages

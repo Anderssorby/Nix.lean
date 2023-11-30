@@ -1,7 +1,7 @@
-import Std
+import Std.Data.HashMap
 import Nix.Utils
 namespace Nix
-open Std
+open Lean
 
 structure StorePath where
   -- The hash is sufficient
@@ -9,8 +9,10 @@ structure StorePath where
   name : String := ""
   deriving BEq, Ord, Hashable
 
+def StorePath.toString (sp : StorePath) : String := sp.hash
+
 instance : ToString StorePath where
-  toString sp := sp.hash
+  toString := StorePath.toString
 
 /-
 A Nix derivation. Equivalent to a drv file.
@@ -32,11 +34,17 @@ structure Derivation where
     env       : HashMap String String
     -- ^ Environment variables provided to the executable used to build the
     -- derivation
-    -- deriving BEq, Ord
-
-instance : ToString Derivation where
-  toString d := s!"Derivation({d.outputs.toList},\n{d.inputDrvs.toList}\n)"
 
 namespace Derivation
+
+def toString (d: Derivation) (format : Bool := false) : String :=
+  s!"Derive({d.outputs.toList.map (λ (n, p) => s!"({n.asStringLitteral},{p.hash.asStringLitteral},\"\",\"\")")},"
+  ++ s!"{d.inputDrvs.toList.map (λ (n, s) => s!"({n.toString.asStringLitteral},{s.toList.map String.asStringLitteral})")},"
+  ++ s!"{d.inputSrcs.toList.map (λ p => s!"({p.hash.asStringLitteral},\"\",\"\")")},"
+  ++ s!"{d.args.toList.map String.asStringLitteral},"
+  ++ s!"{d.system.asStringLitteral},{d.builder.asStringLitteral},{d.args.toList.map String.asStringLitteral},{d.env.toList.map (λ (k, v) => s!"({k.asStringLitteral},{v.asStringLitteral})")})"
+
+instance : ToString Derivation where
+  toString := Derivation.toString
 
 end Nix.Derivation

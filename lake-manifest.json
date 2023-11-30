@@ -1,0 +1,39 @@
+{"version": 4,
+ "packagesDir": "lake-packages",
+ "packages":
+ [{"git":
+   {"url": "https://github.com/anderssorby/Megaparsec.lean.git",
+    "subDir?": null,
+    "rev": "cf40a4d6c7c8c4eaf977e00fb956c2d78f0cce9b",
+    "name": "Megaparsec",
+    "inputRev?": "main"}},
+  {"git":
+   {"url": "https://github.com/anderssorby/YatimaStdLib.lean",
+    "subDir?": null,
+    "rev": "9b110859b79df90f5877e5001f3d34117c1efa84",
+    "name": "YatimaStdLib",
+    "inputRev?": "main"}},
+  {"git":
+   {"url": "https://github.com/yatima-inc/straume",
+    "subDir?": null,
+    "rev": "9597873f0b18a9e97b7315fb84968c55d09a6112",
+    "name": "Straume",
+    "inputRev?": "9597873f0b18a9e97b7315fb84968c55d09a6112"}},
+  {"git":
+   {"url": "https://github.com/yatima-inc/lspec/",
+    "subDir?": null,
+    "rev": "88f7d23e56a061d32c7173cea5befa4b2c248b41",
+    "name": "LSpec",
+    "inputRev?": "88f7d23e56a061d32c7173cea5befa4b2c248b41"}},
+  {"git":
+   {"url": "https://github.com/yatima-inc/Cli.lean",
+    "subDir?": null,
+    "rev": "ef6f9bcd1738638fca8d319dbee653540d56614e",
+    "name": "Cli",
+    "inputRev?": "main"}},
+  {"git":
+   {"url": "https://github.com/leanprover/std4.git",
+    "subDir?": null,
+    "rev": "7d37ab32aac2004fa32e1df5b38d878c2301cd71",
+    "name": "std",
+    "inputRev?": "main"}}]}

@@ -1,4 +1,5 @@
-import Std
+import Std.Data.HashMap
+import Megaparsec.ParserState
 
 /-
 Nix expression AST
@@ -165,10 +166,9 @@ instance : ToString Operator := ⟨λ op : Operator =>
   | mul => "*"
   ⟩
 
-structure Position where
-  start : (Nat × Nat)
-  stop : (Nat × Nat)
-  deriving BEq
+abbrev Position := Megaparsec.ParserState.PosState
+
+abbrev TextRange := Megaparsec.ParserState.Range
 
 mutual
 
@@ -178,17 +178,23 @@ inductive AttrSetKey where
   deriving BEq
 
 /--
-Binding of variables in a lambda.
+Binding of variables in a lambda. To be converted to DeBrujin indexes.
 -/
 inductive LBinding where
   | var (name : Name)
   | destructure (name : Option Name) (vars : Array (Name × Option Expr)) (catchAll : Bool)
 
 /--
+Body term of a lambda
+-/
+inductive Body (binding : LBinging) where
+  | body : Expr
+
+/--
 Nix Expressions not desugared.
 -/
 inductive Expr where
-  | lam (binding : LBinding) (body : Expr) -- $BVar: $Expr
+  | lam (binding : LBinding) (body : Body binding) -- $BVar: $Expr
   | ifStatement (e : Expr) (trueCase : Expr) (falseCase : Expr)
   | withStatement (with_ : Expr) (expr : Expr)
   | letExpr (vars : Array (Prod Name Expr)) (inExpr : Expr)
@@ -196,12 +202,13 @@ inductive Expr where
   | attrset (rec : Bool) (kvPairs : List (AttrSetKey × Expr))
   | fvar (name : Name)
   | list (l : Array Expr)
-  | str (s : String)
   | opr (left : Expr) (op : Operator) (right : Expr)
   -- Constants
   | num (n : Number)
+  | bool (b : Bool)
+  | str (s : String)
   -- Meta info
-  | meta (pos : Position) (docs : Option String) (e : Expr)
+  | meta (rangePos : TextRange) (docs : Option String) (e : Expr)
   deriving BEq
 
 end
@@ -253,6 +260,7 @@ private partial def Expr_toString (e : Expr) : String :=
   | Expr.meta pos doc e => Expr_toString e
   | Expr.opr l op r => s!"{Expr_toString l} {op} {Expr_toString r}"
   | Expr.app f a => s!"{Expr_toString f} {Expr_toString a}"
+  | .bool b => toString b
   -- | _ => "TODO print"
   -- termination_by measure e
 end
